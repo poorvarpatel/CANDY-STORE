@@ -1,10 +1,44 @@
 import React, { useState } from 'react';
 import { Play, Calendar, Target, Trophy, Users, BookOpen, Brain, Clock } from 'lucide-react';
+import GameBoard from './GameBoard';
 
 const StudentDashboard = ({ studentName = "Emma Davis" }) => {
   const [selectedTab, setSelectedTab] = useState('assigned');
+  const [showGameBoard, setShowGameBoard] = useState(false);
+  const [currentGame, setCurrentGame] = useState(null);
 
-  // Mock student data
+  const handleJoinGame = (game) => {
+    setCurrentGame(game);
+    setShowGameBoard(true);
+  };
+
+  const handleStartPractice = (game) => {
+    setCurrentGame({ ...game, mode: 'practice' });
+    setShowGameBoard(true);
+  };
+
+  const handleCloseGame = () => {
+    setShowGameBoard(false);
+    setCurrentGame(null);
+  };
+
+  // Mock student data with consistent calendar
+  const getStudentCalendarData = (studentName) => {
+    // Create consistent activity data based on student name (so it doesn't change)
+    const seed = studentName.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+    const activityDates = [1, 3, 6, 8, 10, 12, 15, 17, 19, 22]; // Fixed activity dates
+    
+    const calendarData = {};
+    activityDates.forEach(day => {
+      // Use seed to generate consistent question counts
+      const baseCount = Math.floor(((seed + day) % 100) / 4) + 8; // 8-33 questions
+      calendarData[day] = day === 6 ? 24 : day === 19 ? 22 : baseCount;
+    });
+    
+    return calendarData;
+  };
+
+  const studentCalendarData = getStudentCalendarData(studentName);
   const mockAssignedGames = [
     {
       id: 1,
@@ -72,7 +106,10 @@ const StudentDashboard = ({ studentName = "Emma Davis" }) => {
               </div>
             </div>
             <div className="flex space-x-3">
-              <button className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2">
+              <button 
+                onClick={() => handleStartPractice({ title: 'Solo Practice Mode', difficulty: 'Custom' })}
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+              >
                 <Brain className="w-4 h-4" />
                 <span>Solo Practice</span>
               </button>
@@ -192,7 +229,10 @@ const StudentDashboard = ({ studentName = "Emma Davis" }) => {
                         </div>
                         
                         <div className="flex space-x-3">
-                          <button className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2">
+                          <button 
+                            onClick={() => handleJoinGame(game)}
+                            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+                          >
                             <Play className="w-4 h-4" />
                             <span>Join Game</span>
                           </button>
@@ -223,7 +263,10 @@ const StudentDashboard = ({ studentName = "Emma Davis" }) => {
                         </div>
                         
                         <div className="flex space-x-3">
-                          <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2">
+                          <button 
+                            onClick={() => handleStartPractice(game)}
+                            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+                          >
                             <Brain className="w-4 h-4" />
                             <span>Start Practice</span>
                           </button>
@@ -254,9 +297,7 @@ const StudentDashboard = ({ studentName = "Emma Davis" }) => {
                 
                 {Array.from({length: 28}, (_, i) => {
                   const day = i + 1;
-                  const activityDates = [1, 3, 6, 8, 10, 12, 15, 17, 19, 22];
-                  const questionsCount = activityDates.includes(day) ? 
-                    (day === 6 ? 24 : day === 19 ? 22 : Math.floor(Math.random() * 15) + 8) : 0;
+                  const questionsCount = studentCalendarData[day] || 0;
                   
                   let bgColor = 'hover:bg-gray-100';
                   if (questionsCount > 20) bgColor = 'bg-purple-600 text-white';
@@ -320,6 +361,15 @@ const StudentDashboard = ({ studentName = "Emma Davis" }) => {
           </div>
         </div>
       </div>
+      
+      {/* Game Board Overlay */}
+      {showGameBoard && (
+        <GameBoard 
+          onClose={handleCloseGame}
+          gameData={currentGame}
+          studentName={studentName}
+        />
+      )}
     </div>
   );
 };
