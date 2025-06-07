@@ -1,26 +1,65 @@
 import React, { useState } from 'react';
-import { Play, Calendar, Target, Trophy, Users, BookOpen, Brain, Clock } from 'lucide-react';
-import GameBoard from './GameBoard';
+import { Play, Calendar, Target, Trophy, Users, BookOpen, Clock } from 'lucide-react';
+import GameBoard from './GameBoard/Gameboard';
+import PathCreator from './PathCreator/PathCreator'; // Add this import
 
 const StudentDashboard = ({ studentName = "Emma Davis" }) => {
   const [selectedTab, setSelectedTab] = useState('assigned');
-  const [showGameBoard, setShowGameBoard] = useState(false);
+  const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard', 'pathCreator', 'gameBoard'
   const [currentGame, setCurrentGame] = useState(null);
+  const [customPath, setCustomPath] = useState(null); // Store the custom path
 
   const handleJoinGame = (game) => {
     setCurrentGame(game);
-    setShowGameBoard(true);
+    setCurrentView('pathCreator'); // Show PathCreator instead of GameBoard
   };
 
   const handleStartPractice = (game) => {
     setCurrentGame({ ...game, mode: 'practice' });
-    setShowGameBoard(true);
+    setCurrentView('pathCreator'); // Show PathCreator for practice too
+  };
+
+  const handlePathComplete = (pathTiles) => {
+    // Called when user finishes creating their path
+    setCustomPath(pathTiles);
+    setCurrentView('gameBoard'); // Now show the GameBoard with the custom path
+  };
+
+  const handleClosePathCreator = () => {
+    setCurrentView('dashboard');
+    setCurrentGame(null);
   };
 
   const handleCloseGame = () => {
-    setShowGameBoard(false);
+    setCurrentView('dashboard');
     setCurrentGame(null);
+    setCustomPath(null);
   };
+
+  // Show PathCreator when creating custom board
+  if (currentView === 'pathCreator') {
+    return (
+      <PathCreator 
+        onClose={handleClosePathCreator}
+        onGameStart={handlePathComplete}
+      />
+    );
+  }
+
+  // Show GameBoard when playing
+  if (currentView === 'gameBoard') {
+    return (
+      <GameBoard 
+        onClose={handleCloseGame}
+        gameData={{
+          ...currentGame,
+          customPath: customPath, // Pass the custom path to GameBoard
+          pathTiles: customPath
+        }}
+        studentName={studentName}
+      />
+    );
+  }
 
   // Mock student data with consistent calendar
   const getStudentCalendarData = (studentName) => {
@@ -110,8 +149,7 @@ const StudentDashboard = ({ studentName = "Emma Davis" }) => {
                 onClick={() => handleStartPractice({ title: 'Solo Practice Mode', difficulty: 'Custom' })}
                 className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
               >
-                <Brain className="w-4 h-4" />
-                <span>Solo Practice</span>
+                <span>🎨 Create Custom Board</span>
               </button>
             </div>
           </div>
@@ -170,6 +208,22 @@ const StudentDashboard = ({ studentName = "Emma Davis" }) => {
           </div>
         </div>
 
+        {/* Custom Board Status */}
+        {customPath && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-8">
+            <h3 className="text-lg font-semibold text-green-800 mb-2">🎨 Your Custom Game Board</h3>
+            <p className="text-green-700 mb-4">
+              You created a custom {customPath.length}-tile adventure board! Ready to play again?
+            </p>
+            <button 
+              onClick={() => setCurrentView('gameBoard')}
+              className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium"
+            >
+              🎮 Play Your Custom Board
+            </button>
+          </div>
+        )}
+
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Learning Activities */}
           <div className="lg:col-span-2">
@@ -200,7 +254,6 @@ const StudentDashboard = ({ studentName = "Emma Davis" }) => {
                     }`}
                   >
                     <div className="flex items-center justify-center space-x-2">
-                      <Brain className="w-5 h-5" />
                       <span>Suggested Learning</span>
                     </div>
                   </button>
@@ -234,7 +287,7 @@ const StudentDashboard = ({ studentName = "Emma Davis" }) => {
                             className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
                           >
                             <Play className="w-4 h-4" />
-                            <span>Join Game</span>
+                            <span>🎨 Create & Join Game</span>
                           </button>
                           <button className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors">
                             View Details
@@ -267,8 +320,7 @@ const StudentDashboard = ({ studentName = "Emma Davis" }) => {
                             onClick={() => handleStartPractice(game)}
                             className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
                           >
-                            <Brain className="w-4 h-4" />
-                            <span>Start Practice</span>
+                            <span>🎨 Create Custom Board</span>
                           </button>
                         </div>
                       </div>
@@ -361,15 +413,6 @@ const StudentDashboard = ({ studentName = "Emma Davis" }) => {
           </div>
         </div>
       </div>
-      
-      {/* Game Board Overlay */}
-      {showGameBoard && (
-        <GameBoard 
-          onClose={handleCloseGame}
-          gameData={currentGame}
-          studentName={studentName}
-        />
-      )}
     </div>
   );
 };
