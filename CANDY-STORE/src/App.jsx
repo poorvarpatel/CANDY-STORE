@@ -9,9 +9,9 @@ import StudentDashboard from './components/StudentDashboard.jsx';
 const mockTeacher = {
   name: "Ms. Johnson",
   classes: [
-    { id: 1, name: "Biology 101", studentCount: 6 },
-    { id: 2, name: "Advanced Biology", studentCount: 6 },
-    { id: 3, name: "AP Biology", studentCount: 6 }
+    { id: 1, name: "Biology 101", studentCount: 8 },
+    { id: 2, name: "Advanced Biology", studentCount: 8 },
+    { id: 3, name: "AP Biology", studentCount: 8 }
   ]
 };
 
@@ -21,7 +21,9 @@ const mockStudents = [
   { id: 3, name: "Emma Davis", email: "emma.d@school.edu", notes: "" },
   { id: 4, name: "James Wilson", email: "james.w@school.edu", notes: "Excellent at memorization, needs help with application" },
   { id: 5, name: "Maria Garcia", email: "maria.g@school.edu", notes: "" },
-  { id: 6, name: "Oliver Kim", email: "oliver.k@school.edu", notes: "Visual learner, responds well to diagrams" }
+  { id: 6, name: "Oliver Kim", email: "oliver.k@school.edu", notes: "Visual learner, responds well to diagrams" },
+  { id: 7, name: "Sophia Lee", email: "sophia.l@school.edu", notes: "" },
+  { id: 8, name: "Liam Masterson", email: "liam.m@school.edu", notes: "Needs to review mitosis" },
 ];
 
 const App = () => {
