@@ -36,7 +36,7 @@ const ClassDashboard = ({
             <div className="flex space-x-3">
               <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2">
                 <Play className="w-4 h-4" />
-                <span>Create Game</span>
+                <span>Create Game Rooms</span>
               </button>
               <button className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors">
                 <Settings className="w-4 h-4" />

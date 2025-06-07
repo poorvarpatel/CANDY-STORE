@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload } from 'lucide-react';
+import { Upload, FileText, Loader2 } from 'lucide-react';
 
 const StudentDetail = ({ 
   selectedClass, 
@@ -9,6 +9,11 @@ const StudentDetail = ({
   onBackToDashboard 
 }) => {
   const [chartView, setChartView] = useState('accuracy');
+  const [studentFocus, setStudentFocus] = useState('');
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [lessonContent, setLessonContent] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [conceptSummary, setConceptSummary] = useState('');
 
   const mockImprovementData = [
     { date: '2/1', sessions: 1, totalQuestions: 8 },
@@ -22,6 +27,55 @@ const StudentDetail = ({
     { date: '2/19', sessions: 1, totalQuestions: 22 },
     { date: '2/22', sessions: 1, totalQuestions: 19 }
   ];
+
+  const handleFileUpload = (event) => {
+    const files = Array.from(event.target.files);
+    setUploadedFiles(prev => [...prev, ...files]);
+  };
+
+  const removeFile = (index) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const autoPopulateFocus = (shouldPopulate) => {
+    if (shouldPopulate) {
+      const notes = studentNotes[selectedStudent?.id] || selectedStudent?.notes || '';
+      setStudentFocus(notes);
+    } else {
+      setStudentFocus('');
+    }
+  };
+
+  const processLessonContent = async () => {
+    setIsProcessing(true);
+    try {
+      // Simulate AI processing - replace with actual AI integration
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const mockSummary = `Personalized Content for ${selectedStudent?.name}:
+      
+Key Concepts Identified:
+1. DNA Structure and Components
+   - Double helix structure
+   - Nucleotide composition (A, T, G, C)
+   - Base pairing rules
+
+2. DNA Replication Process
+   - Semi-conservative replication
+   - Role of DNA polymerase
+   - Leading and lagging strands
+
+Student Focus Areas: ${studentFocus || 'General biology concepts'}
+
+Generated 12 personalized quiz questions tailored to this student's learning needs.`;
+      
+      setConceptSummary(mockSummary);
+    } catch (error) {
+      console.error('Error processing lesson:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -56,22 +110,139 @@ const StudentDetail = ({
           </div>
         </div>
 
-        {/* File Upload Area for Student */}
-        <div className="bg-white rounded-xl shadow-sm border-2 border-dashed border-gray-300 hover:border-indigo-400 transition-colors p-8 mb-8">
-          <div className="text-center">
-            <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">Upload Lesson Content for {selectedStudent?.name}</h3>
-            <p className="text-gray-600 mb-4">Create personalized learning content for this student</p>
-            <div className="mb-4">
-              <textarea 
-                placeholder="Optional: Add specific learning goals or focus areas for this student (e.g., 'Focus on nucleus components from provided list')"
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y min-h-20 mb-4"
+        {/* Lesson Plan Processor for Individual Student */}
+        <div className="bg-white rounded-xl shadow-sm mb-8">
+          <div className="p-6 border-b border-gray-200">
+            <h2 className="text-xl font-bold text-gray-800 flex items-center">
+              <FileText className="w-5 h-5 mr-2" />
+              Create Personalized Content for {selectedStudent?.name}
+            </h2>
+            <p className="text-gray-600 text-sm mt-1">Upload lesson content or paste text to create personalized learning experiences</p>
+          </div>
+          
+          <div className="p-6 space-y-6">
+            {/* Student Focus Goals */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Learning Focus Goals for {selectedStudent?.name}
+                </label>
+                <label className="flex items-center space-x-2 text-xs text-gray-600">
+                  <input
+                    type="checkbox"
+                    onChange={(e) => autoPopulateFocus(e.target.checked)}
+                    className="rounded text-indigo-600"
+                  />
+                  <span>Auto-populate from teacher notes</span>
+                </label>
+              </div>
+              <textarea
+                value={studentFocus}
+                onChange={(e) => setStudentFocus(e.target.value)}
+                placeholder="Specific learning goals or focus areas for this student (e.g., 'Focus on nucleus components from provided list')"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y min-h-20"
               />
             </div>
-            <p className="text-sm text-gray-500 mb-4">Supports PDF, DOC, DOCX, JPG, XLS, PPT and more</p>
-            <button className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
-              Choose Files
+
+            {/* File Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Upload Lesson Files
+              </label>
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-indigo-400 transition-colors">
+                <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-600 mb-2">Upload lesson files for personalized content</p>
+                <p className="text-xs text-gray-500 mb-4">Supports PDF, DOC, DOCX, JPG, XLS, PPT</p>
+                <input
+                  type="file"
+                  multiple
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx,.ppt,.pptx"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="student-file-upload"
+                />
+                <label
+                  htmlFor="student-file-upload"
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer inline-block"
+                >
+                  Choose Files
+                </label>
+              </div>
+              
+              {/* File List */}
+              {uploadedFiles.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {uploadedFiles.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                      <span className="text-sm text-gray-700">{file.name}</span>
+                      <button
+                        onClick={() => removeFile(index)}
+                        className="text-red-500 hover:text-red-700 text-sm"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Text Input */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Or Paste Lesson Content
+              </label>
+              <textarea
+                value={lessonContent}
+                onChange={(e) => setLessonContent(e.target.value)}
+                placeholder="Paste your lesson content here for personalized processing..."
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y h-32"
+              />
+            </div>
+
+            {/* Process Button */}
+            <button
+              onClick={processLessonContent}
+              disabled={!lessonContent.trim() && uploadedFiles.length === 0}
+              className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Creating Personalized Content...</span>
+                </>
+              ) : (
+                <>
+                  <FileText className="w-4 h-4" />
+                  <span>Create Personalized Content</span>
+                </>
+              )}
             </button>
+
+            {/* Concept Summary */}
+            {conceptSummary && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <h4 className="font-medium text-green-800 mb-2">AI-Generated Personalized Content</h4>
+                <pre className="text-sm text-green-700 whitespace-pre-wrap">{conceptSummary}</pre>
+                <div className="mt-4 flex space-x-3">
+                  <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm">
+                    Approve & Create Individual Session
+                  </button>
+                  <button 
+                    onClick={processLessonContent}
+                    className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm"
+                  >
+                    Regenerate
+                  </button>
+                  <button 
+                    onClick={() => setConceptSummary('')}
+                    className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
