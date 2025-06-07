@@ -19,10 +19,10 @@ const LoginPage = ({ onLogin }) => {
             </div>
           </div>
           <h1 className="text-4xl font-bold text-gray-800 mb-4">
-            Educational Game Platform
+            CANDY STORE
           </h1>
           <p className="text-xl text-gray-600">
-            Transform learning into an adventure! Choose your role to get started.
+            For Graduates of CANDY LAND (R)
           </p>
         </div>
 
