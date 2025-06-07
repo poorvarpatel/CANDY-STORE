@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import LoginPage from './components/LoginPage.jsx';
-import ClassSelection from './components/ClassSelection.jsx';
-import ClassDashboard from './components/ClassDashboard.jsx';
-import StudentDetail from './components/StudentDetail.jsx';
+import ClassSelection from './components/TeacherPages/ClassSelection.jsx';
+import ClassDashboard from './components/TeacherPages/ClassDashboard.jsx';
+import StudentDetail from './components/TeacherPages/StudentDetail.jsx';
 import StudentDashboard from './components/StudentDashboard.jsx';
 
 // Mock data
