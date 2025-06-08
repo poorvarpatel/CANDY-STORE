@@ -1,4 +1,4 @@
-// backend/server.js - Fresh OpenAI Version
+// backend/server.js - Fixed OpenAI Version with 5 Answer Options
 // NO CHANGES NEEDED - PDF export is handled client-side
 const express = require('express');
 const cors = require('cors');
@@ -61,7 +61,7 @@ app.get('/test-openai', async (req, res) => {
   }
 });
 
-// AI Processing Function
+// 🔧 FIXED: AI Processing Function - Now forces 5 answer options
 async function processWithAI(content, type, studentName, studentFocus) {
   console.log('🤖 Processing with OpenAI...');
   
@@ -80,8 +80,20 @@ Please provide:
 2. Key concepts relevant to this student's focus areas
 3. Personalized learning objectives
 4. Specific topics this student should focus on
-5. 20 targeted quiz questions (~90-95% multiple choice, ~5-10% fill in the blank) appropriate for individual study. Clear link to which key concept, personalized learning objective, or topic of focus listed above is being assessed.
-6. Answers provided for each question.
+5. 20 targeted quiz questions with EXACTLY 5 answer choices each (A, B, C, D, E). Format each question as:
+
+Question X: [Question text]
+A) [Option 1]
+B) [Option 2]
+C) [Option 3]
+D) [Option 4]  
+E) [Option 5]
+Correct Answer: [Letter]
+Explanation: [Brief explanation]
+
+6. Make sure ALL questions have exactly 5 options - never use only A, B, C, D.
+
+CRITICAL: Every single question must have options A, B, C, D, and E. Do not create questions with only 4 options.
 
 Format your response as a clear, structured analysis that helps this student learn effectively.`;
   } else {
@@ -95,7 +107,18 @@ Please provide:
 2. Main topics and subtopics
 3. Important facts and relationships
 4. 10-12 discussion questions for class engagement
-5. Suggested quiz questions
+5. Suggested quiz questions with EXACTLY 5 answer choices each (A, B, C, D, E)
+
+For quiz questions, use this format:
+Question X: [Question text]
+A) [Option 1]
+B) [Option 2] 
+C) [Option 3]
+D) [Option 4]
+E) [Option 5]
+Correct Answer: [Letter]
+
+CRITICAL: Every single question must have options A, B, C, D, and E. Do not create questions with only 4 options.
 
 Format your response as a clear educational summary that a teacher can review and use for lesson planning.`;
   }
@@ -106,14 +129,14 @@ Format your response as a clear educational summary that a teacher can review an
       messages: [
         {
           role: "system", 
-          content: "You are an expert educational content analyzer specializing in creating engaging learning materials."
+          content: "You are an expert educational content analyzer. When creating quiz questions, you MUST always provide exactly 5 answer choices (A, B, C, D, E) for each question. Never create questions with only 4 options."
         },
         {
           role: "user",
           content: prompt
         }
       ],
-      max_tokens: 2000, // Increased from 800 to allow for 25 questions
+      max_tokens: 2500, // Increased to accommodate 5-option questions
       temperature: 0.7
     });
 
@@ -174,7 +197,7 @@ ${content.substring(0, 300)}...
 🎯 Student Focus Areas: ${studentFocus || 'General learning goals'}
 
 📝 What OpenAI Will Generate:
-1. Personalized quiz questions based on focus areas
+1. Personalized quiz questions based on focus areas (with 5 options each)
 2. Difficulty adjusted for this student  
 3. Progress tracking recommendations
 4. Custom learning objectives
@@ -194,7 +217,7 @@ ${content.substring(0, 300)}...
 1. Structured summary of key concepts
 2. Main topics and subtopics  
 3. Learning objectives and assessments
-4. 25 engaging quiz questions
+4. 25 engaging quiz questions (with 5 options each)
 
 🔧 Fix: Check your OPENAI_API_KEY in backend/.env
 
@@ -216,42 +239,60 @@ ${content.substring(0, 300)}...
   }
 });
 
-// Quiz generation endpoint
+// 🔧 FIXED: Quiz generation endpoint - Now forces 5 answer options
 app.post('/api/generate-quiz', async (req, res) => {
   console.log('🎯 OpenAI Quiz generation:', req.body);
   
   const { conceptSummary, studentGoals, difficulty = 'medium' } = req.body;
 
   try {
-    const prompt = `Based on the following educational content, generate 8 multiple-choice quiz questions at ${difficulty} difficulty level.
+    // 🔧 IMPROVED PROMPT: More specific about 5 options
+    const prompt = `You are creating educational quiz questions. Generate 8 multiple-choice questions at ${difficulty} difficulty level.
+
+IMPORTANT: Each question MUST have exactly 5 answer choices labeled A, B, C, D, and E.
 
 Educational Content:
 ${conceptSummary}
 
 Student Goals: ${studentGoals || 'General understanding'}
 
-For each question, provide:
-1. Clear question text
-2. 5 answer choices (A, B, C, D, E)  
-3. Correct answer
-4. Brief explanation
+FORMAT REQUIREMENTS (follow this exact format):
+Question 1: [Your question here]
+A) [Option 1]
+B) [Option 2] 
+C) [Option 3]
+D) [Option 4]
+E) [Option 5]
+Correct Answer: [A, B, C, D, or E]
+Explanation: [Brief explanation]
 
-Format as a numbered list of questions.`;
+Question 2: [Your question here]
+A) [Option 1]
+B) [Option 2]
+C) [Option 3] 
+D) [Option 4]
+E) [Option 5]
+Correct Answer: [A, B, C, D, or E]
+Explanation: [Brief explanation]
+
+[Continue for all 8 questions]
+
+CRITICAL: Do NOT generate questions with only 4 options. Every single question requires exactly 5 options (A through E).`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
         {
           role: "system", 
-          content: "You are an expert quiz creator for educational content. Create engaging, accurate multiple-choice questions."
+          content: "You are an expert quiz creator. You MUST create questions with exactly 5 answer choices (A, B, C, D, E) for each question. Never use only 4 options."
         },
         {
           role: "user",
           content: prompt
         }
       ],
-      max_tokens: 1500, // Increased to ensure full quiz generation
-      temperature: 0.8
+      max_tokens: 2000, // Increased for more detailed responses
+      temperature: 0.7 // Slightly lower for more consistent formatting
     });
     
     res.json({
@@ -261,32 +302,48 @@ Format as a numbered list of questions.`;
         difficulty,
         generatedAt: new Date().toISOString(),
         aiGenerated: true,
-        aiProvider: 'OpenAI GPT-3.5'
+        aiProvider: 'OpenAI GPT-3.5',
+        optionCount: 5 // Track that we requested 5 options
       }
     });
 
   } catch (error) {
     console.error('🚨 OpenAI Quiz Error:', error.message);
     
+    // 🔧 IMPROVED FALLBACK: Mock with 5 options
     res.json({
       success: true,
-      questions: `🎯 Mock Quiz Questions (OpenAI Error)
+      questions: `🎯 Mock Quiz Questions (OpenAI Error - 5 Options)
 
 ❌ OpenAI Error: ${error.message}
 
-📝 Sample questions based on your content:
+📝 Sample questions with 5 options each:
 
-1. Question: What is the main concept from the lesson?
-   A) Option 1  B) Option 2  C) Option 3  D) Option 4
-   Correct: A
-   Explanation: Mock explanation
+Question 1: What is the main concept from the lesson?
+A) First concept option
+B) Second concept option  
+C) Third concept option
+D) Fourth concept option
+E) Fifth concept option
+Correct Answer: A
+Explanation: Mock explanation for first option
+
+Question 2: Which statement best describes the process?
+A) Process description 1
+B) Process description 2
+C) Process description 3  
+D) Process description 4
+E) Process description 5
+Correct Answer: C
+Explanation: Mock explanation for third option
 
 🔧 Fix: Check your OPENAI_API_KEY in backend/.env`,
       metadata: {
         difficulty,
         generatedAt: new Date().toISOString(),
         aiGenerated: false,
-        error: error.message
+        error: error.message,
+        optionCount: 5
       }
     });
   }
@@ -312,7 +369,7 @@ app.listen(PORT, () => {
   console.log(`🔍 Health check: http://localhost:${PORT}/health`);
   console.log(`🤖 AI Provider: OpenAI GPT-3.5`);
   console.log(`🔑 API Key Status: ${process.env.OPENAI_API_KEY ? '✅ Configured' : '❌ Missing'}`);
-  console.log(`🎯 Ready to create amazing educational content!`);
+  console.log(`🎯 Ready to create amazing educational content with 5-option quizzes!`);
 });
 
 module.exports = app;
