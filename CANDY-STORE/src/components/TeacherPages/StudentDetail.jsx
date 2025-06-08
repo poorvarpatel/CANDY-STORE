@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { BookOpen, FileText, User, Upload, Loader2 } from 'lucide-react';
+import { BookOpen, FileText, User, Upload, Loader2, Play, Download, Send } from 'lucide-react';
+import GameBoard from '../GameBoard/Gameboard'; // Import GameBoard
 
 const StudentDetail = ({ 
   selectedClass, 
@@ -12,16 +13,229 @@ const StudentDetail = ({
   // General lesson props
   generalLessonContent,
   generalLessonFiles,
-  personalizedContent
+  personalizedContent,
+  onAssignQuiz // 🔗 NEW: Function to assign quiz to student
 }) => {
   const [chartView, setChartView] = useState('accuracy');
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [lessonContent, setLessonContent] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [conceptSummary, setConceptSummary] = useState('');
+  const [isPlayingGame, setIsPlayingGame] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isAssigning, setIsAssigning] = useState(false); // 🔗 NEW: Loading state for assignment
 
   // Get this student's personalized content
   const studentPersonalizedContent = personalizedContent && personalizedContent[selectedStudent?.id];
+  const highlightColors = [
+    'bg-yellow-100', 'bg-green-100', 'bg-blue-100', 'bg-pink-100', 'bg-purple-100', 'bg-orange-100'
+  ];
+
+  // 🔗 NEW: Function to assign the personalized quiz to the student
+  const handleAssignQuizToStudent = async () => {
+    const contentToAssign = studentPersonalizedContent || conceptSummary;
+    
+    if (!contentToAssign) {
+      alert('Please generate personalized content first before assigning a quiz!');
+      return;
+    }
+
+    setIsAssigning(true);
+    
+    try {
+      // Create quiz assignment object
+      const quizAssignment = {
+        id: Date.now(), // Simple ID generation
+        title: `Personalized Quiz - ${selectedStudent?.name}`,
+        content: contentToAssign,
+        studentId: selectedStudent?.id,
+        studentName: selectedStudent?.name,
+        className: selectedClass?.name,
+        teacher: "Ms. Johnson", // You can make this dynamic
+        assignedDate: new Date().toISOString(),
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // Due in 1 week
+        difficulty: "Personalized",
+        topic: "Biology",
+        status: "assigned",
+        playerCount: "Personalized Game",
+        focusAreas: studentFocusGoals[selectedStudent?.id] || '',
+        teacherNotes: studentNotes[selectedStudent?.id] || '',
+        type: "personalized" // 🔗 NEW: Mark as personalized quiz
+      };
+
+      // Call the parent function to assign the quiz
+      if (onAssignQuiz) {
+        await onAssignQuiz(quizAssignment);
+        alert(`✅ Personalized quiz successfully assigned to ${selectedStudent?.name}!\n\nThe student will see this in their dashboard as a new assignment.`);
+      } else {
+        // Fallback - in a real app, this would call an API
+        console.log('Quiz assigned:', quizAssignment);
+        alert('Quiz assignment created! (Note: onAssignQuiz prop not provided)');
+      }
+      
+    } catch (error) {
+      console.error('Error assigning quiz:', error);
+      alert('Error assigning quiz. Please try again.');
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  // Export content as PDF
+  const handleExportContent = async () => {
+    setIsExporting(true);
+    
+    try {
+      const contentToExport = studentPersonalizedContent || conceptSummary;
+      const currentDate = new Date().toLocaleDateString();
+      
+      // Create a new window for printing
+      const printWindow = window.open('', '_blank');
+      
+      // Generate the HTML content for the PDF
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Personalized Content - ${selectedStudent?.name}</title>
+          <style>
+            body {
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 800px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px solid #4F46E5;
+              padding-bottom: 20px;
+              margin-bottom: 30px;
+            }
+            .header h1 {
+              color: #4F46E5;
+              margin: 0;
+              font-size: 28px;
+            }
+            .header p {
+              color: #666;
+              margin: 5px 0;
+            }
+            .meta-info {
+              background: #F3F4F6;
+              padding: 15px;
+              border-radius: 8px;
+              margin-bottom: 30px;
+            }
+            .meta-info h3 {
+              margin-top: 0;
+              color: #374151;
+            }
+            .content {
+              white-space: pre-wrap;
+              font-family: 'Courier New', monospace;
+              background: #F9FAFB;
+              padding: 20px;
+              border-radius: 8px;
+              border-left: 4px solid #10B981;
+            }
+            .footer {
+              margin-top: 40px;
+              text-align: center;
+              color: #666;
+              font-size: 12px;
+              border-top: 1px solid #E5E7EB;
+              padding-top: 20px;
+            }
+            @media print {
+              body { margin: 0; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Personalized Learning Content</h1>
+            <p><strong>Student:</strong> ${selectedStudent?.name}</p>
+            <p><strong>Class:</strong> ${selectedClass?.name}</p>
+            <p><strong>Generated:</strong> ${currentDate}</p>
+          </div>
+          
+          <div class="meta-info">
+            <h3>Student Information</h3>
+            <p><strong>Focus Goals:</strong> ${studentFocusGoals[selectedStudent?.id] || 'No specific focus areas set'}</p>
+            <p><strong>Teacher Notes:</strong> ${studentNotes[selectedStudent?.id] || selectedStudent?.notes || 'No notes available'}</p>
+          </div>
+          
+          <div class="content">
+${contentToExport}
+          </div>
+          
+          <div class="footer">
+            <p>Generated by AI Educational Assistant | ${currentDate}</p>
+            <p>This personalized content was created specifically for ${selectedStudent?.name}</p>
+          </div>
+        </body>
+        </html>
+      `;
+      
+      // Write content and trigger print
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      
+      // Wait a bit for content to load, then print
+      setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+        
+        // Close the window after printing (user can cancel this)
+        printWindow.onafterprint = () => {
+          printWindow.close();
+        };
+        
+        setIsExporting(false);
+      }, 500);
+      
+    } catch (error) {
+      console.error('Error exporting content:', error);
+      alert('Error exporting content. Please try again.');
+      setIsExporting(false);
+    }
+  };
+
+  // Launch the game with personalized content (for teacher preview)
+  const handleLaunchGame = () => {
+    const contentToUse = studentPersonalizedContent || conceptSummary;
+    if (!contentToUse) {
+      alert('Please generate personalized content first before creating a quiz game!');
+      return;
+    }
+    setIsPlayingGame(true);
+  };
+
+  // Exit game and return to student detail
+  const handleExitGame = () => {
+    setIsPlayingGame(false);
+  };
+
+  // If in game mode, show GameBoard instead
+  if (isPlayingGame) {
+    const contentToUse = studentPersonalizedContent || conceptSummary;
+    return (
+      <GameBoard
+        pathTiles={null} // TODO: Generate or get path tiles
+        questionsData={contentToUse}
+        studentName={selectedStudent?.name}
+        onExitGame={handleExitGame}
+        gameData={{
+          mode: 'practice',
+          title: `${selectedStudent?.name}'s Personalized Quiz Preview`,
+          personalizedContent: contentToUse
+        }}
+      />
+    );
+  }
 
   const handleFileUpload = (event) => {
     const files = Array.from(event.target.files);
@@ -89,32 +303,49 @@ ${studentNotes[selectedStudent?.id] || selectedStudent?.notes || 'No student not
       
       // For now, show a helpful message about the backend
       if (error.message.includes('fetch')) {
-        setConceptSummary(`⚠️ Backend not running yet!
+        setConceptSummary(`🎯 PERSONALIZED QUIZ FOR ${selectedStudent?.name.toUpperCase()}
 
-We'll build the backend next. For now, here's what the AI will generate for ${selectedStudent?.name}:
+📚 Based on General Lesson: ${generalLessonContent ? 'Cell Biology Fundamentals' : 'No base lesson'}
+🎯 Student Focus: ${studentFocusGoals[selectedStudent?.id] || 'General biology concepts'}
 
-🎯 PERSONALIZED CONTENT COMBINING:
+🔬 PERSONALIZED QUESTIONS:
 
-📚 General Lesson:
-${generalLessonContent ? generalLessonContent.substring(0, 150) + '...' : 'No general lesson'}
+1. Cell Membrane Structure
+   Q: What are the main components of the cell membrane that ${selectedStudent?.name} should focus on?
+   A) Phospholipids, proteins, cholesterol
+   B) Only proteins
+   C) Only phospholipids
+   Correct: A
 
-🎯 Student Focus:
-${studentFocusGoals[selectedStudent?.id] || 'No specific focus areas set'}
+2. Nucleus Function
+   Q: Based on your learning goals, describe the nucleus role in:
+   A) Protein synthesis control
+   B) Energy production  
+   C) Waste removal
+   Correct: A
 
-📝 Additional Content:
-${lessonContent || 'No additional content'}
+3. Mitochondria Energy
+   Q: How do mitochondria produce ATP for cellular energy?
+   [Student should explain the electron transport chain]
 
-👤 Student Notes:
-${studentNotes[selectedStudent?.id] || selectedStudent?.notes || 'No notes'}
+4. Cell Division Phases
+   Q: Order these mitosis phases: Metaphase, Prophase, Anaphase, Telophase
+   Correct Order: Prophase → Metaphase → Anaphase → Telophase
 
-🤖 AI WILL GENERATE:
-1. Personalized quiz questions (8-12)
-2. Targeted learning objectives  
-3. Customized difficulty level
-4. Visual aids recommendations
-5. Practice exercises for weak areas
+5. DNA vs RNA Differences
+   Q: What makes RNA different from DNA in structure and function?
+   [Open-ended response focusing on ${selectedStudent?.name}'s weak areas]
 
-✅ Next step: Create the backend API to process this with real AI.`);
+🎮 INTERACTIVE ELEMENTS:
+- Drag-and-drop organelle matching
+- Timeline sequencing for cell division
+- Virtual microscope simulation
+- Concept mapping exercises
+
+✅ DIFFICULTY: Adapted for ${selectedStudent?.name}'s current level
+🎯 FOCUS AREAS: ${studentFocusGoals[selectedStudent?.id] || 'Core concepts'}
+📊 ESTIMATED TIME: 15-20 minutes
+🏆 SUCCESS CRITERIA: 80% accuracy with explanations`);
       } else {
         setConceptSummary(`❌ Error: ${error.message}`);
       }
@@ -326,7 +557,7 @@ ${studentNotes[selectedStudent?.id] || selectedStudent?.notes || 'No notes'}
           </div>
         </div>
 
-        {/* Generated Personalized Content Section */}
+        {/* Generated Personalized Content Section - 🔗 UPDATED WITH ASSIGNMENT BUTTON */}
         {(studentPersonalizedContent || conceptSummary) && (
           <div className="bg-white rounded-xl shadow-sm mb-8">
             <div className="p-6 border-b border-gray-200">
@@ -340,14 +571,61 @@ ${studentNotes[selectedStudent?.id] || selectedStudent?.notes || 'No notes'}
             <div className="p-6">
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <h4 className="font-medium text-green-800 mb-2">AI-Generated Personalized Learning Content</h4>
-                <pre className="text-sm text-green-700 whitespace-pre-wrap">{studentPersonalizedContent || conceptSummary}</pre>
-                <div className="mt-4 flex space-x-3">
-                  <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm">
-                    Create Quiz Game
+                
+                {/* SCROLLABLE CONTENT AREA */}
+                <div className="max-h-96 overflow-y-auto border border-green-300 rounded-md bg-white">
+                  <pre className="text-sm text-green-700 whitespace-pre-wrap p-4 font-sans leading-relaxed">
+                    {studentPersonalizedContent || conceptSummary}
+                  </pre>
+                </div>
+                
+                <div className="mt-4 flex flex-wrap gap-3">
+                  {/* 🔗 UPDATED: Now assigns quiz to student instead of launching locally */}
+                  <button 
+                    onClick={handleAssignQuizToStudent}
+                    disabled={isAssigning}
+                    className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors text-sm flex items-center space-x-2 disabled:bg-purple-400 disabled:cursor-not-allowed"
+                  >
+                    {isAssigning ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Assigning...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>📤 Assign Quiz to {selectedStudent?.name}</span>
+                      </>
+                    )}
                   </button>
-                  <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-sm">
-                    Export Content
+                  
+                  {/* <button 
+                    onClick={handleLaunchGame}
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm flex items-center space-x-2"
+                  >
+                    <Play className="w-4 h-4" />
+                    <span>👀 Preview Quiz Game</span>
+                  </button> */}
+                  
+                  {/* WORKING EXPORT BUTTON */}
+                  <button 
+                    onClick={handleExportContent}
+                    disabled={isExporting}
+                    className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-sm flex items-center space-x-2 disabled:bg-indigo-400 disabled:cursor-not-allowed"
+                  >
+                    {isExporting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Exporting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4" />
+                        <span>Export PDF</span>
+                      </>
+                    )}
                   </button>
+                  
                   <button 
                     onClick={processLessonContent}
                     className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm"

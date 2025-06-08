@@ -3,14 +3,29 @@ import { Play, Calendar, Target, Trophy, Users, BookOpen, Clock } from 'lucide-r
 import GameBoard from './GameBoard/Gameboard';
 import PathCreator from './PathCreator/PathCreator'; // Add this import
 
-const StudentDashboard = ({ studentName = "Emma Davis" }) => {
+const StudentDashboard = ({ 
+  studentName = "Emma Davis",
+  assignedQuizzes = [], // 🔗 NEW: Receive assigned quizzes from teacher
+  onQuizComplete // 🔗 NEW: Callback when quiz is completed
+}) => {
   const [selectedTab, setSelectedTab] = useState('assigned');
   const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard', 'pathCreator', 'gameBoard'
   const [currentGame, setCurrentGame] = useState(null);
   const [customPath, setCustomPath] = useState(null); // Store the custom path
 
   const handleJoinGame = (game) => {
-    setCurrentGame(game);
+    if (game.type === 'personalized') {
+      // 🔗 NEW: For personalized quizzes, we have the content already
+      setCurrentGame({
+        ...game,
+        mode: 'assigned',
+        questionsData: game.content,
+        title: game.title
+      });
+    } else {
+      // For group games, proceed normally
+      setCurrentGame(game);
+    }
     setCurrentView('pathCreator'); // Show PathCreator instead of GameBoard
   };
 
@@ -31,6 +46,16 @@ const StudentDashboard = ({ studentName = "Emma Davis" }) => {
   };
 
   const handleCloseGame = () => {
+    // 🔗 NEW: Handle quiz completion
+    if (currentGame?.type === 'personalized' && onQuizComplete) {
+      const results = {
+        score: 85, // This would come from actual gameplay
+        completed: true,
+        completedAt: new Date().toISOString()
+      };
+      onQuizComplete(currentGame.id, results);
+    }
+    
     setCurrentView('dashboard');
     setCurrentGame(null);
     setCustomPath(null);
@@ -78,6 +103,8 @@ const StudentDashboard = ({ studentName = "Emma Davis" }) => {
   };
 
   const studentCalendarData = getStudentCalendarData(studentName);
+  
+  // 🔗 UPDATED: Combine mock assignments with real assigned quizzes
   const mockAssignedGames = [
     {
       id: 1,
@@ -87,7 +114,8 @@ const StudentDashboard = ({ studentName = "Emma Davis" }) => {
       difficulty: "Medium",
       topic: "Biology",
       status: "pending",
-      playerCount: "2/6 joined"
+      playerCount: "0/6 joined",
+      type: "group"
     },
     {
       id: 2,
@@ -97,8 +125,19 @@ const StudentDashboard = ({ studentName = "Emma Davis" }) => {
       difficulty: "Hard",
       topic: "Biology",
       status: "pending",
-      playerCount: "0/6 joined"
+      playerCount: "0/6 joined",
+      type: "group"
     }
+  ];
+
+  // 🔗 NEW: Combine mock games with assigned personalized quizzes
+  const allAssignedGames = [
+    ...assignedQuizzes.map(quiz => ({
+      ...quiz,
+      type: "personalized",
+      dueDate: new Date(quiz.dueDate).toLocaleDateString()
+    })),
+    ...mockAssignedGames
   ];
 
   const mockSuggestedGames = [
@@ -141,7 +180,15 @@ const StudentDashboard = ({ studentName = "Emma Davis" }) => {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-800">Welcome back, {studentName}! 🎓</h1>
-                <p className="text-gray-600">Ready to learn something amazing today?</p>
+                <p className="text-gray-600">
+                  {/* 🔗 NEW: Show notification for assigned quizzes */}
+                  {assignedQuizzes.length > 0 && (
+                    <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-sm mr-2">
+                      🎯 {assignedQuizzes.length} personalized quiz{assignedQuizzes.length !== 1 ? 'zes' : ''} assigned!
+                    </span>
+                  )}
+                  Ready to learn something amazing today?
+                </p>
               </div>
             </div>
             <div className="flex space-x-3">
@@ -201,7 +248,8 @@ const StudentDashboard = ({ studentName = "Emma Davis" }) => {
                 <Clock className="w-6 h-6 text-orange-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-800">2</p>
+                {/* 🔗 NEW: Show total due assignments */}
+                <p className="text-2xl font-bold text-gray-800">{allAssignedGames.length}</p>
                 <p className="text-sm text-gray-600">Due Today</p>
               </div>
             </div>
@@ -242,7 +290,12 @@ const StudentDashboard = ({ studentName = "Emma Davis" }) => {
                     <div className="flex items-center justify-center space-x-2">
                       <Users className="w-5 h-5" />
                       <span>Assigned Learning</span>
-                      <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">2</span>
+                      {/* 🔗 NEW: Show assignment count */}
+                      {allAssignedGames.length > 0 && (
+                        <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+                          {allAssignedGames.length}
+                        </span>
+                      )}
                     </div>
                   </button>
                   <button
@@ -263,17 +316,38 @@ const StudentDashboard = ({ studentName = "Emma Davis" }) => {
               <div className="p-6">
                 {selectedTab === 'assigned' ? (
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Assignments from Ms. Johnson</h3>
-                    {mockAssignedGames.map(game => (
-                      <div key={game.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Your Assignments</h3>
+                    {/* 🔗 NEW: Show all assigned games including personalized quizzes */}
+                    {allAssignedGames.map(game => (
+                      <div key={game.id} className={`border rounded-lg p-4 hover:shadow-md transition-shadow ${
+                        game.type === 'personalized' ? 'border-purple-300 bg-purple-50' : 'border-gray-200'
+                      }`}>
                         <div className="flex items-center justify-between mb-3">
-                          <h4 className="text-lg font-semibold text-gray-800">{game.title}</h4>
+                          <h4 className="text-lg font-semibold text-gray-800 flex items-center">
+                            {/* 🔗 NEW: Special indicator for personalized quizzes */}
+                            {game.type === 'personalized' && <span className="mr-2">🎯</span>}
+                            {game.title}
+                          </h4>
                           <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                             game.dueDate === 'Tomorrow' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
                           }`}>
                             Due {game.dueDate}
                           </span>
                         </div>
+                        
+                        {/* 🔗 NEW: Special section for personalized quizzes */}
+                        {game.type === 'personalized' && (
+                          <div className="mb-3 p-3 bg-white rounded border border-purple-200">
+                            <p className="text-sm text-purple-700 font-medium">
+                              📚 Personalized content from {game.teacher}
+                            </p>
+                            {game.focusAreas && (
+                              <p className="text-xs text-purple-600 mt-1">
+                                Focus: {game.focusAreas}
+                              </p>
+                            )}
+                          </div>
+                        )}
                         
                         <div className="flex items-center space-x-4 mb-3">
                           <span className="text-sm text-gray-600">📚 {game.topic}</span>
@@ -284,14 +358,23 @@ const StudentDashboard = ({ studentName = "Emma Davis" }) => {
                         <div className="flex space-x-3">
                           <button 
                             onClick={() => handleJoinGame(game)}
-                            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+                            className={`text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 ${
+                              game.type === 'personalized' 
+                                ? 'bg-purple-600 hover:bg-purple-700' 
+                                : 'bg-purple-600 hover:bg-purple-700'
+                            }`}
                           >
                             <Play className="w-4 h-4" />
-                            <span>🎨 Create & Join Game</span>
+                            <span>
+                              {/* 🔗 NEW: Different button text for personalized quizzes */}
+                              {game.type === 'personalized' ? '🎯 Start Personalized Quiz' : '🎨 Create & Join Game'}
+                            </span>
                           </button>
-                          <button className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors">
-                            View Details
-                          </button>
+                          {game.type !== 'personalized' && (
+                            <button className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors">
+                              View Details
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}

@@ -1,14 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TILE_COLORS, COLOR_SETS } from '../SceneElements/Tiles';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const GameQuestionBox = ({ 
   currentQuestion = null,
   onAnswerSelect,
-  gameStats = { currentQuestion: 1, totalQuestions: 10, score: 0, totalAttempts: 0 }
+  onNavigateQuestion, // New prop for question navigation
+  gameStats = { currentQuestion: 1, totalQuestions: 10, score: 0, totalAttempts: 0 },
+  canGoBack = true, // New prop to enable/disable going back
+  isCorrectAnswer = false // New prop to trigger auto-minimize
 }) => {
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [showingResult, setShowingResult] = useState(false);
+
+  // Auto-minimize when correct answer is chosen
+  useEffect(() => {
+    if (isCorrectAnswer && selectedAnswer !== null) {
+      setShowingResult(true);
+      setIsMinimized(true);
+      
+      // Auto-restore after 3 seconds for next question
+      const timer = setTimeout(() => {
+        setIsMinimized(false);
+        setShowingResult(false);
+        setSelectedAnswer(null); // Reset for next question
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isCorrectAnswer, selectedAnswer]);
 
   // Get the 5 game colors
   const gameColors = COLOR_SETS.game; // ['red', 'blue', 'green', 'yellow', 'purple']
@@ -38,6 +59,13 @@ const GameQuestionBox = ({
     }
   };
 
+  const handleNavigateQuestion = (direction) => {
+    if (onNavigateQuestion) {
+      onNavigateQuestion(direction);
+      setSelectedAnswer(null); // Reset selection when navigating
+    }
+  };
+
   if (isMinimized) {
     return (
       <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white/95 backdrop-blur-sm rounded-lg shadow-xl border border-gray-200 z-20">
@@ -46,7 +74,9 @@ const GameQuestionBox = ({
           className="flex items-center space-x-3 p-3 hover:bg-gray-50 rounded-lg transition-colors"
         >
           <ChevronUp className="w-5 h-5 text-gray-600" />
-          <span className="font-semibold text-gray-800">Question {gameStats.currentQuestion}</span>
+          <span className="font-semibold text-gray-800">
+            {showingResult ? '🎉 Watching animation...' : `Question ${gameStats.currentQuestion}`}
+          </span>
           <div className="text-sm text-indigo-600 font-medium">{gameStats.score}/{gameStats.totalAttempts}</div>
         </button>
       </div>
@@ -56,9 +86,41 @@ const GameQuestionBox = ({
   return (
     <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white/95 backdrop-blur-sm rounded-xl shadow-2xl border border-gray-200 z-20 w-[90vw] max-w-6xl">
       <div className="p-4">
-        {/* Minimize Button */}
+        {/* Header with Navigation and Minimize */}
         <div className="flex justify-between items-center mb-4">
-          <div className="text-lg font-bold text-gray-800">Question {gameStats.currentQuestion}</div>
+          <div className="flex items-center space-x-3">
+            {/* Previous Question Button */}
+            {canGoBack && gameStats.currentQuestion > 1 && (
+              <button
+                onClick={() => handleNavigateQuestion('previous')}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Previous question"
+              >
+                <ChevronLeft className="w-5 h-5 text-gray-600" />
+              </button>
+            )}
+            
+            <div className="text-lg font-bold text-gray-800">
+              Question {gameStats.currentQuestion}
+              {canGoBack && (
+                <span className="text-sm text-gray-500 ml-2">
+                  (Click ← to review previous questions)
+                </span>
+              )}
+            </div>
+            
+            {/* Next Question Button - for reviewing */}
+            {canGoBack && gameStats.currentQuestion < gameStats.totalQuestions && (
+              <button
+                onClick={() => handleNavigateQuestion('next')}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Next question"
+              >
+                <ChevronRight className="w-5 h-5 text-gray-600" />
+              </button>
+            )}
+          </div>
+
           <button
             onClick={() => setIsMinimized(true)}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
