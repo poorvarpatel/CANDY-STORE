@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
+import { createTileBoard, cleanupTiles } from '../SceneElements/Tiles';
 
 const PathTo3DBoard = ({ pathTiles, onClose, onStartGame }) => {
   const mountRef = useRef(null);
@@ -17,181 +18,6 @@ const PathTo3DBoard = ({ pathTiles, onClose, onStartGame }) => {
     target: new THREE.Vector3(0, 0, 0),
     autoFollow: true
   });
-
-  // Game colors for tiles
-  const TILE_COLORS = {
-    red: 0xff4444,
-    teal: 0x14b8a6,
-    lightGreen: 0x84cc16,
-    orange: 0xf97316,
-    purple: 0xa855f7,
-    wild: 0xfbbf24,
-    gate: 0x8b5cf6,
-    rainbow: 0xffffff,
-    treeCastle: 0x228b22
-  };
-
-  // Convert 2D path to 3D coordinates
-  const convertPathTo3D = (path2D) => {
-    if (!path2D || path2D.length === 0) return [];
-    
-    const path3D = [];
-    const colorOptions = ['red', 'teal', 'lightGreen', 'orange', 'purple'];
-    
-    // Scale factor to convert canvas coordinates to 3D world
-    const scaleX = 0.1;
-    const scaleZ = 0.1;
-    const centerX = 400;
-    const centerY = 200;
-    
-    path2D.forEach((point2D, index) => {
-      const x = (point2D.x - centerX) * scaleX;
-      const z = (point2D.y - centerY) * scaleZ;
-      
-      // Add height variation
-      let y = 0;
-      const progress = index / path2D.length;
-      y += progress * 8; // Rise toward the end
-      y += (Math.random() - 0.5) * 2; // Random variation
-      y += Math.sin(progress * 6 * Math.PI) * 1.5; // Wave pattern
-      
-      // Determine tile type and color
-      let tileType = 'colored';
-      let color;
-      
-      if (index === path2D.length - 1) {
-        tileType = 'rainbow';
-        color = 'rainbow';
-      } else if (index > 10 && Math.random() < 0.05) {
-        tileType = 'gate';
-        color = 'gate';
-      } else if (index > 5 && Math.random() < 0.08) {
-        tileType = 'wild';
-        color = 'wild';
-      } else {
-        // Smart color selection with 7-tile rule
-        let selectedColor = colorOptions[index % 5];
-        if (Math.random() < 0.4) {
-          selectedColor = colorOptions[Math.floor(Math.random() * 5)];
-        }
-        color = selectedColor;
-      }
-      
-      path3D.push({
-        id: index,
-        position: { x, y, z },
-        type: tileType,
-        color: color,
-        colorValue: TILE_COLORS[color] || TILE_COLORS.treeCastle,
-        original2D: point2D
-      });
-    });
-    
-    return path3D;
-  };
-
-  // Create 3D tiles from path data
-  const create3DTiles = (scene, path3D) => {
-    const tiles = [];
-    
-    path3D.forEach((tileData, index) => {
-      if (index === path3D.length - 1) {
-        // Create castle at the end
-        createCastle(scene, tileData.position);
-        
-        // Rainbow destination tile
-        const geometry = new THREE.CylinderGeometry(1.5, 1.5, 0.3, 12);
-        const material = new THREE.MeshLambertMaterial({ 
-          color: tileData.colorValue,
-          transparent: true,
-          opacity: 0.9
-        });
-        
-        const tile = new THREE.Mesh(geometry, material);
-        tile.position.set(tileData.position.x, tileData.position.y, tileData.position.z);
-        tile.castShadow = true;
-        tile.receiveShadow = true;
-        
-        scene.add(tile);
-        tiles.push({ mesh: tile, data: tileData });
-        
-      } else {
-        // Regular game tiles
-        const geometry = new THREE.CylinderGeometry(1, 1, 0.2, 8);
-        const material = new THREE.MeshLambertMaterial({ color: tileData.colorValue });
-        
-        const tile = new THREE.Mesh(geometry, material);
-        tile.position.set(tileData.position.x, tileData.position.y, tileData.position.z);
-        tile.castShadow = true;
-        tile.receiveShadow = true;
-        
-        // Special effects for gate tiles
-        if (tileData.type === 'gate') {
-          const glowGeometry = new THREE.RingGeometry(1.1, 1.3, 16);
-          const glowMaterial = new THREE.MeshBasicMaterial({
-            color: 0x8b5cf6,
-            transparent: true,
-            opacity: 0.5
-          });
-          const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-          glow.rotation.x = -Math.PI / 2;
-          glow.position.y = 0.11;
-          tile.add(glow);
-        }
-        
-        scene.add(tile);
-        tiles.push({ mesh: tile, data: tileData });
-      }
-    });
-    
-    return tiles;
-  };
-
-  // Create castle at the end position
-  const createCastle = (scene, position) => {
-    const group = new THREE.Group();
-    
-    // Main castle structure
-    const castleGeometry = new THREE.CylinderGeometry(4, 5, 5, 12);
-    const castleMaterial = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
-    const castle = new THREE.Mesh(castleGeometry, castleMaterial);
-    castle.position.y = 2.5;
-    group.add(castle);
-    
-    // Towers around the castle
-    for (let t = 0; t < 6; t++) {
-      const angle = (t / 6) * Math.PI * 2;
-      const towerGeo = new THREE.CylinderGeometry(0.8, 0.8, 4, 12);
-      const tower = new THREE.Mesh(towerGeo, castleMaterial);
-      tower.position.x = Math.cos(angle) * 4.5;
-      tower.position.z = Math.sin(angle) * 4.5;
-      tower.position.y = 4;
-      group.add(tower);
-      
-      const roofGeo = new THREE.ConeGeometry(1.2, 2, 12);
-      const roofMat = new THREE.MeshLambertMaterial({ color: 0xff0000 });
-      const roof = new THREE.Mesh(roofGeo, roofMat);
-      roof.position.copy(tower.position);
-      roof.position.y += 2.5;
-      group.add(roof);
-    }
-    
-    // Central spire
-    const spireGeo = new THREE.CylinderGeometry(0.3, 0.5, 10, 12);
-    const spireMat = new THREE.MeshLambertMaterial({ color: 0xffd700 });
-    const spire = new THREE.Mesh(spireGeo, spireMat);
-    spire.position.y = 7.5;
-    group.add(spire);
-    
-    const crownGeo = new THREE.ConeGeometry(1.5, 3, 12);
-    const crownMat = new THREE.MeshLambertMaterial({ color: 0xffd700 });
-    const crown = new THREE.Mesh(crownGeo, crownMat);
-    crown.position.y = 11;
-    group.add(crown);
-    
-    group.position.set(position.x, position.y, position.z);
-    scene.add(group);
-  };
 
   // Update camera position
   const updateCamera = (camera, orbitState) => {
@@ -229,6 +55,43 @@ const PathTo3DBoard = ({ pathTiles, onClose, onStartGame }) => {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     mountRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
+
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(10, 20, 5);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    scene.add(directionalLight);
+
+    // Create tiles using centralized function
+    const { tileMeshes, path3D } = createTileBoard(scene, pathTiles, {
+      mode: 'preview',
+      includeSpecialTiles: true,
+      includeCastle: true,
+      includeEffects: true
+    });
+    
+    tilesRef.current = tileMeshes;
+    console.log('Created 3D path with', path3D.length, 'tiles');
+
+    // Position camera to view the entire path
+    if (path3D.length > 0) {
+      const startPos = path3D[0].position;
+      const endPos = path3D[path3D.length - 1].position;
+      
+      const centerX = (startPos[0] + endPos[0]) / 2;
+      const centerY = (startPos[1] + endPos[1]) / 2 + 5;
+      const centerZ = (startPos[2] + endPos[2]) / 2;
+      
+      const orbitState = orbitStateRef.current;
+      orbitState.target.set(centerX, centerY, centerZ);
+      orbitState.spherical.radius = Math.max(30, path3D.length * 0.5);
+      updateCamera(camera, orbitState);
+    }
 
     // Orbit controls
     const orbitState = orbitStateRef.current;
@@ -279,38 +142,6 @@ const PathTo3DBoard = ({ pathTiles, onClose, onStartGame }) => {
     renderer.domElement.addEventListener('mouseleave', handleMouseUp);
     renderer.domElement.addEventListener('wheel', handleWheel, { passive: false });
 
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambientLight);
-
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(10, 20, 5);
-    directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
-    scene.add(directionalLight);
-
-    // Convert 2D path to 3D and create tiles
-    const path3D = convertPathTo3D(pathTiles);
-    console.log('Converted to 3D path with', path3D.length, 'tiles');
-    
-    const tiles = create3DTiles(scene, path3D);
-    tilesRef.current = tiles;
-
-    // Position camera to view the entire path
-    if (path3D.length > 0) {
-      const startPos = path3D[0].position;
-      const endPos = path3D[path3D.length - 1].position;
-      
-      const centerX = (startPos.x + endPos.x) / 2;
-      const centerY = (startPos.y + endPos.y) / 2 + 5;
-      const centerZ = (startPos.z + endPos.z) / 2;
-      
-      orbitState.target.set(centerX, centerY, centerZ);
-      orbitState.spherical.radius = Math.max(30, path3D.length * 0.5);
-      updateCamera(camera, orbitState);
-    }
-
     // Animation loop
     const animate = () => {
       requestAnimationFrame(animate);
@@ -331,6 +162,9 @@ const PathTo3DBoard = ({ pathTiles, onClose, onStartGame }) => {
       console.log('Cleaning up 3D board...');
       isInitializedRef.current = false;
       
+      // Use centralized cleanup
+      cleanupTiles(scene, tileMeshes);
+      
       document.body.style.overflow = originalOverflow;
       window.removeEventListener('resize', handleResize);
       
@@ -345,20 +179,6 @@ const PathTo3DBoard = ({ pathTiles, onClose, onStartGame }) => {
       if (mountRef.current && renderer.domElement) {
         mountRef.current.removeChild(renderer.domElement);
       }
-      
-      // Clean up all geometries and materials
-      scene.traverse((object) => {
-        if (object.geometry) {
-          object.geometry.dispose();
-        }
-        if (object.material) {
-          if (Array.isArray(object.material)) {
-            object.material.forEach(material => material.dispose());
-          } else {
-            object.material.dispose();
-          }
-        }
-      });
       
       renderer.dispose();
       sceneRef.current = null;
@@ -375,9 +195,9 @@ const PathTo3DBoard = ({ pathTiles, onClose, onStartGame }) => {
       const startPos = path3D[0].position;
       const endPos = path3D[path3D.length - 1].position;
       
-      const centerX = (startPos.x + endPos.x) / 2;
-      const centerY = (startPos.y + endPos.y) / 2 + 5;
-      const centerZ = (startPos.z + endPos.z) / 2;
+      const centerX = (startPos[0] + endPos[0]) / 2;
+      const centerY = (startPos[1] + endPos[1]) / 2 + 5;
+      const centerZ = (startPos[2] + endPos[2]) / 2;
       
       orbitState.target.set(centerX, centerY, centerZ);
       orbitState.spherical.set(Math.max(30, path3D.length * 0.5), Math.PI / 4, 0);

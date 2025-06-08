@@ -1,176 +1,297 @@
+// Tiles.jsx - Centralized tile logic for both preview and game modes
 import * as THREE from 'three';
 
-// Tile colors
-const TILE_COLORS = {
-  red: 0xff4444,
-  teal: 0x14b8a6,
-  lightGreen: 0x84cc16,
-  orange: 0xf97316,
-  purple: 0xa855f7,
-  wild: 0xfbbf24,
-  gate: 0x8b5cf6,
-  rainbow: 0xffffff,
-  treeCastle: 0x228b22
+// Unified color system
+export const TILE_COLORS = {
+  red: { hex: 0xff4444, name: 'Red' },
+  blue: { hex: 0x4444ff, name: 'Blue' },
+  green: { hex: 0x44ff44, name: 'Green' },
+  yellow: { hex: 0xffff44, name: 'Yellow' },
+  purple: { hex: 0xff44ff, name: 'Purple' },
+  teal: { hex: 0x14b8a6, name: 'Teal' },
+  lightGreen: { hex: 0x84cc16, name: 'Light Green' },
+  orange: { hex: 0xf97316, name: 'Orange' },
+  wild: { hex: 0xfbbf24, name: 'Wild' },
+  gate: { hex: 0x8b5cf6, name: 'Gate' },
+  rainbow: { hex: 0xffffff, name: 'Rainbow' }
 };
 
-// Generate board path data
-export const generateBoardPath = () => {
-  const totalTiles = 60 + Math.floor(Math.random() * 21);
-  const tiles = [];
-  const colorOptions = ['red', 'teal', 'lightGreen', 'orange', 'purple'];
-  
-  for (let i = 0; i < totalTiles; i++) {
-    const progress = i / totalTiles;
+// Color sets for different modes
+export const COLOR_SETS = {
+  game: ['red', 'blue', 'green', 'yellow', 'purple'],
+  preview: ['red', 'teal', 'lightGreen', 'orange', 'purple']
+};
+
+// Generate color sequence with validation
+export function generateColorSequence(pathLength, colorSet = COLOR_SETS.game) {
+  if (pathLength < 7) {
+    return Array.from({ length: pathLength }, (_, i) => colorSet[i % colorSet.length]);
+  }
+
+  const sequence = [...colorSet, colorSet[0], colorSet[1]];
+
+  for (let i = 7; i < pathLength; i++) {
+    const lastSix = sequence.slice(i - 6, i);
+    const colorCount = {};
+    colorSet.forEach(color => colorCount[color] = 0);
+    lastSix.forEach(color => colorCount[color]++);
     
-    // Spacing between tiles
-    const tileSpacing = 4.5;
-    const forwardDistance = i * tileSpacing;
-    
-    // Side movement for interesting path
-    let sideMovement = 0;
-    sideMovement += Math.sin(progress * 4 * Math.PI) * 3;
-    sideMovement += Math.sin(progress * 8 * Math.PI) * 1.5;
-    sideMovement += (Math.random() - 0.5) * 2;
-    
-    // Occasional sharp turns
-    if (Math.random() < 0.08) {
-      sideMovement += (Math.random() - 0.5) * 4;
-    }
-    
-    // Height variation
-    const baseHeight = progress * 12;
-    const randomHeightVariation = (Math.random() - 0.5) * 1.5;
-    const terrainHeight = baseHeight + randomHeightVariation;
-    
-    const x = sideMovement;
-    const z = forwardDistance - (totalTiles * tileSpacing / 2);
-    const y = terrainHeight;
-    
-    // Determine tile type and color
-    let tileType = 'colored';
-    let color;
-    
-    if (i === totalTiles - 1) {
-      tileType = 'rainbow';
-      color = 'rainbow';
-    } else if (i > 10 && Math.random() < 0.05) {
-      tileType = 'gate';
-      color = 'gate';
-    } else if (i > 5 && Math.random() < 0.08) {
-      tileType = 'wild';
-      color = 'wild';
-    } else {
-      // Smart color selection with 7-tile rule
-      let selectedColor;
-      
-      if (i >= 6) {
-        const recentColors = [];
-        for (let j = 1; j <= 6; j++) {
-          const recentTile = tiles[i - j];
-          if (recentTile && colorOptions.includes(recentTile.color)) {
-            recentColors.push(recentTile.color);
-          }
-        }
-        
-        const missingColors = colorOptions.filter(c => !recentColors.includes(c));
-        if (missingColors.length > 0) {
-          selectedColor = missingColors[Math.floor(Math.random() * missingColors.length)];
-        }
-      }
-      
-      if (!selectedColor) {
-        let baseColor = colorOptions[i % 5];
-        if (Math.random() < 0.4) {
-          baseColor = colorOptions[Math.floor(Math.random() * 5)];
-        }
-        selectedColor = baseColor;
-      }
-      
-      // Prevent three in a row
-      if (i >= 2) {
-        const prev1 = tiles[i-1]?.color;
-        const prev2 = tiles[i-2]?.color;
-        
-        if (prev1 === prev2 && prev1 === selectedColor) {
-          const otherColors = colorOptions.filter(c => c !== selectedColor);
-          selectedColor = otherColors[Math.floor(Math.random() * otherColors.length)];
-        }
-      }
-      
-      color = selectedColor;
-    }
-    
-    tiles.push({
-      id: i,
-      position: { x, y, z },
-      type: tileType,
-      color: color,
-      colorValue: TILE_COLORS[color] || TILE_COLORS.treeCastle
-    });
+    const minCount = Math.min(...Object.values(colorCount));
+    const candidateColors = colorSet.filter(color => colorCount[color] === minCount);
+    const nextColor = candidateColors[Math.floor(Math.random() * candidateColors.length)];
+    sequence.push(nextColor);
   }
   
-  return tiles;
-};
+  return sequence;
+}
 
-// Create tile meshes and add to scene
-export const createTiles = (scene, tilesData) => {
-  const tileMeshes = [];
+// Validate color sequence (7-tile rule)
+export function validateColorSequence(sequence, colorSet = COLOR_SETS.game) {
+  if (sequence.length < 7) return true;
   
-  tilesData.forEach((tileData, index) => {
-    if (index === tilesData.length - 1) {
-      // Final rainbow tile (destination)
-      const geometry = new THREE.CylinderGeometry(1.5, 1.5, 0.3, 12);
-      const material = new THREE.MeshLambertMaterial({ 
-        color: tileData.colorValue,
-        transparent: true,
-        opacity: 0.9
-      });
-      
-      const tile = new THREE.Mesh(geometry, material);
-      tile.position.set(tileData.position.x, tileData.position.y, tileData.position.z);
-      tile.castShadow = true;
-      tile.receiveShadow = true;
-      
-      scene.add(tile);
-      tileMeshes.push({ mesh: tile, data: tileData });
-      
-    } else {
-      // Regular tiles
-      const geometry = new THREE.CylinderGeometry(1, 1, 0.2, 8);
-      const material = new THREE.MeshLambertMaterial({ color: tileData.colorValue });
-      
-      const tile = new THREE.Mesh(geometry, material);
-      tile.position.set(tileData.position.x, tileData.position.y, tileData.position.z);
-      tile.castShadow = true;
-      tile.receiveShadow = true;
-      
-      // Special effects for special tiles
-      if (tileData.type === 'gate') {
-        const glowGeometry = new THREE.RingGeometry(1.1, 1.3, 16);
-        const glowMaterial = new THREE.MeshBasicMaterial({
-          color: 0x8b5cf6,
-          transparent: true,
-          opacity: 0.5
-        });
-        const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-        glow.rotation.x = -Math.PI / 2;
-        glow.position.y = 0.11;
-        tile.add(glow);
-      }
-      
-      scene.add(tile);
-      tileMeshes.push({ mesh: tile, data: tileData });
+  for (let i = 0; i <= sequence.length - 7; i++) {
+    const window = sequence.slice(i, i + 7);
+    const uniqueColors = new Set(window);
+    if (uniqueColors.size < colorSet.length) return false;
+  }
+  
+  return true;
+}
+
+// Convert 2D path to 3D coordinates
+export function convertPathTo3D(path2D, options = {}) {
+  const {
+    mode = 'game', // 'game' or 'preview'
+    includeSpecialTiles = false,
+    heightVariation = true,
+    scale = 0.9
+  } = options;
+
+  if (!path2D || path2D.length === 0) return { path3D: [], colorSequence: [], isValid: true };
+
+  const colorSet = COLOR_SETS[mode];
+  const colorSequence = generateColorSequence(path2D.length, colorSet);
+  const isValid = validateColorSequence(colorSequence, colorSet);
+
+  // Normalize path coordinates
+  const xs = path2D.map(p => p.x ?? p[0]);
+  const ys = path2D.map(p => p.y ?? p[1]);
+  const xMin = Math.min(...xs);
+  const xMax = Math.max(...xs);
+  const yMin = Math.min(...ys);
+  const yMax = Math.max(...ys);
+  const xRange = xMax - xMin || 1;
+  const yRange = yMax - yMin || 1;
+
+  const path3D = [];
+
+  path2D.forEach((point2D, index) => {
+    const x = ((point2D.x ?? point2D[0]) - xMin - xRange / 2) * scale;
+    const z = ((point2D.y ?? point2D[1]) - yMin - yRange / 2) * scale;
+    
+    // Calculate height
+    let y = 0;
+    if (heightVariation) {
+      const progress = index / path2D.length;
+      y += progress * 8; // Rise toward the end
+      y += Math.sin(progress * 4 * Math.PI) * 1.5; // Wave pattern
+      y += (Math.random() - 0.5) * 0.5; // Random variation
     }
+
+    // Determine tile type and color
+    let tileType = 'colored';
+    let colorKey = colorSequence[index];
+
+    if (includeSpecialTiles && mode === 'preview') {
+      if (index === path2D.length - 1) {
+        tileType = 'rainbow';
+        colorKey = 'rainbow';
+      } else if (index > 10 && Math.random() < 0.05) {
+        tileType = 'gate';
+        colorKey = 'gate';
+      } else if (index > 5 && Math.random() < 0.08) {
+        tileType = 'wild';
+        colorKey = 'wild';
+      }
+    }
+
+    const colorData = TILE_COLORS[colorKey];
+
+    path3D.push({
+      id: index,
+      position: [x, y, z],
+      type: tileType,
+      colorKey: colorKey,
+      colorValue: colorData.hex,
+      colorName: colorData.name,
+      isStart: index === 0,
+      isEnd: index === path2D.length - 1
+    });
+  });
+
+  return { path3D, colorSequence, isValid };
+}
+
+// Create tile mesh for Three.js
+export function createTileMesh(tileData, options = {}) {
+  const {
+    radius = 1,
+    height = 0.3,
+    segments = 8,
+    includeEffects = false
+  } = options;
+
+  // Main tile geometry
+  const geometry = new THREE.CylinderGeometry(radius, radius, height, segments);
+  const material = new THREE.MeshLambertMaterial({ 
+    color: tileData.colorValue,
+    transparent: tileData.type === 'rainbow',
+    opacity: tileData.type === 'rainbow' ? 0.9 : 1.0
+  });
+
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.position.set(...tileData.position);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+
+  // Add special effects
+  if (includeEffects) {
+    // Start/End markers
+    if (tileData.isStart || tileData.isEnd) {
+      const ringGeometry = new THREE.RingGeometry(radius + 0.1, radius + 0.4, 16);
+      const ringMaterial = new THREE.MeshBasicMaterial({
+        color: tileData.isStart ? 0x00ff00 : 0xffd700,
+        transparent: true,
+        opacity: 0.6
+      });
+      const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = height / 2 + 0.01;
+      mesh.add(ring);
+    }
+
+    // Gate glow effect
+    if (tileData.type === 'gate') {
+      const glowGeometry = new THREE.RingGeometry(radius + 0.1, radius + 0.3, 16);
+      const glowMaterial = new THREE.MeshBasicMaterial({
+        color: 0x8b5cf6,
+        transparent: true,
+        opacity: 0.5
+      });
+      const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+      glow.rotation.x = -Math.PI / 2;
+      glow.position.y = height / 2 + 0.01;
+      mesh.add(glow);
+    }
+  }
+
+  return mesh;
+}
+
+// Create castle for end position (preview mode)
+export function createCastle(scene, position) {
+  const group = new THREE.Group();
+  
+  // Main castle structure
+  const castleGeometry = new THREE.CylinderGeometry(4, 5, 5, 12);
+  const castleMaterial = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
+  const castle = new THREE.Mesh(castleGeometry, castleMaterial);
+  castle.position.y = 2.5;
+  group.add(castle);
+  
+  // Towers around the castle
+  for (let t = 0; t < 6; t++) {
+    const angle = (t / 6) * Math.PI * 2;
+    const towerGeo = new THREE.CylinderGeometry(0.8, 0.8, 4, 12);
+    const tower = new THREE.Mesh(towerGeo, castleMaterial);
+    tower.position.x = Math.cos(angle) * 4.5;
+    tower.position.z = Math.sin(angle) * 4.5;
+    tower.position.y = 4;
+    group.add(tower);
+    
+    const roofGeo = new THREE.ConeGeometry(1.2, 2, 12);
+    const roofMat = new THREE.MeshLambertMaterial({ color: 0xff0000 });
+    const roof = new THREE.Mesh(roofGeo, roofMat);
+    roof.position.copy(tower.position);
+    roof.position.y += 2.5;
+    group.add(roof);
+  }
+  
+  // Central spire
+  const spireGeo = new THREE.CylinderGeometry(0.3, 0.5, 10, 12);
+  const spireMat = new THREE.MeshLambertMaterial({ color: 0xffd700 });
+  const spire = new THREE.Mesh(spireGeo, spireMat);
+  spire.position.y = 7.5;
+  group.add(spire);
+  
+  const crownGeo = new THREE.ConeGeometry(1.5, 3, 12);
+  const crownMat = new THREE.MeshLambertMaterial({ color: 0xffd700 });
+  const crown = new THREE.Mesh(crownGeo, crownMat);
+  crown.position.y = 11;
+  group.add(crown);
+  
+  group.position.set(...position);
+  scene.add(group);
+  
+  return group;
+}
+
+// Create all tiles for a scene
+export function createTileBoard(scene, pathTiles, options = {}) {
+  const {
+    mode = 'game',
+    includeSpecialTiles = mode === 'preview',
+    includeEffects = true,
+    includeCastle = mode === 'preview'
+  } = options;
+
+  const { path3D } = convertPathTo3D(pathTiles, { 
+    mode, 
+    includeSpecialTiles,
+    ...options 
   });
   
-  return tileMeshes;
-};
+  const tileMeshes = [];
 
-// Remove all tiles from scene
-export const removeTiles = (scene, tileMeshes) => {
+  path3D.forEach((tileData, index) => {
+    // Skip creating mesh for final tile if we're adding a castle
+    if (includeCastle && index === path3D.length - 1) {
+      createCastle(scene, tileData.position);
+      return;
+    }
+
+    const tileMesh = createTileMesh(tileData, {
+      radius: tileData.isEnd && !includeCastle ? 1.5 : 1,
+      includeEffects,
+      ...options
+    });
+
+    scene.add(tileMesh);
+    tileMeshes.push({ mesh: tileMesh, data: tileData });
+  });
+
+  return { tileMeshes, path3D };
+}
+
+// Clean up tiles from scene
+export function cleanupTiles(scene, tileMeshes) {
   tileMeshes.forEach(({ mesh }) => {
     scene.remove(mesh);
-    mesh.geometry.dispose();
-    mesh.material.dispose();
+    
+    // Dispose of geometries and materials
+    if (mesh.geometry) mesh.geometry.dispose();
+    if (mesh.material) {
+      if (Array.isArray(mesh.material)) {
+        mesh.material.forEach(mat => mat.dispose());
+      } else {
+        mesh.material.dispose();
+      }
+    }
+    
+    // Clean up any child meshes (effects)
+    mesh.traverse((child) => {
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) child.material.dispose();
+    });
   });
-};
+}
