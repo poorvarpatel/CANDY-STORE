@@ -35,6 +35,15 @@ const App = () => {
   const [selectedClass, setSelectedClass] = useState(null);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentNotes, setStudentNotes] = useState({});
+  const [studentFocusGoals, setStudentFocusGoals] = useState({});
+
+  // General lesson state (auto-syncs to all students)
+  const [generalLessonContent, setGeneralLessonContent] = useState('');
+  const [generalLessonFiles, setGeneralLessonFiles] = useState([]);
+
+  // Personalized content per student (generated from processing)
+  const [personalizedContent, setPersonalizedContent] = useState({});
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Auto-save notes simulation
   useEffect(() => {
@@ -63,6 +72,10 @@ const App = () => {
     setSelectedClass(null);
     setSelectedStudent(null);
     setStudentNotes({});
+    setStudentFocusGoals({});
+    setGeneralLessonContent('');
+    setGeneralLessonFiles([]);
+    setPersonalizedContent({});
   };
 
   // Teacher flow handlers
@@ -71,6 +84,92 @@ const App = () => {
       ...prev,
       [studentId]: note
     }));
+  };
+
+  const handleFocusGoalChange = (studentId, goal) => {
+    setStudentFocusGoals(prev => ({
+      ...prev,
+      [studentId]: goal
+    }));
+  };
+
+  // Handle general lesson content changes (auto-sync)
+  const handleGeneralLessonChange = (content, files) => {
+    setGeneralLessonContent(content);
+    setGeneralLessonFiles(files);
+    console.log('📚 General lesson content auto-synced to all students');
+  };
+
+  // Process content to create personalized content for each student
+  const handleProcessContent = async () => {
+    if (!generalLessonContent.trim() && generalLessonFiles.length === 0) {
+      console.log('No general content to process');
+      return;
+    }
+
+    setIsProcessing(true);
+    
+    try {
+      // Create personalized content for each student
+      const newPersonalizedContent = {};
+      
+      for (const student of mockStudents) {
+        const studentNote = studentNotes[student.id] || student.notes || '';
+        
+        // Simulate AI processing - would be replaced with real API call
+        const personalizedText = await simulateAIProcessing(
+          generalLessonContent,
+          generalLessonFiles,
+          student,
+          studentNote
+        );
+        
+        newPersonalizedContent[student.id] = personalizedText;
+      }
+      
+      setPersonalizedContent(newPersonalizedContent);
+      console.log('✨ Personalized content generated for all students');
+      
+    } catch (error) {
+      console.error('Error processing content:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Simulate AI processing (replace with real API call)
+  const simulateAIProcessing = async (content, files, student, notes) => {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+    
+    const fileInfo = files.length > 0 ? `\n\nShared Files: ${files.map(f => f.name).join(', ')}` : '';
+    
+    return `⚠️ Backend not running yet!
+
+When the backend is ready, here's what will be generated for ${student.name}:
+
+🎯 PERSONALIZED LEARNING CONTENT:
+
+📚 General Lesson Context:
+${content.substring(0, 200)}${content.length > 200 ? '...' : ''}${fileInfo}
+
+👤 Student Profile:
+- Name: ${student.name}
+- Notes: ${notes || 'No specific notes'}
+
+🧠 AI-Generated Personalized Content:
+1. Key concepts tailored to ${student.name}'s learning style
+2. Specific focus areas based on teacher notes
+3. 8-12 personalized quiz questions
+4. Difficulty adjustments based on student's strengths/struggles
+5. Visual aids recommendations (especially for visual learners)
+6. Practice exercises targeting identified weak areas
+
+✅ Next step: Build backend API to generate real personalized content using AI.
+
+This content was generated from:
+- General lesson: "${content.substring(0, 50)}..."
+- Student notes: "${notes.substring(0, 50)}..."`;
   };
 
   const handleClassSelect = (cls) => {
@@ -119,7 +218,7 @@ const App = () => {
     );
   }
 
-  // Teacher flow (existing logic)
+  // Teacher flow
   if (currentUser.role === 'teacher') {
     return (
       <div>
@@ -147,8 +246,17 @@ const App = () => {
             students={mockStudents}
             studentNotes={studentNotes}
             onNoteChange={handleNoteChange}
+            studentFocusGoals={studentFocusGoals}
+            onFocusGoalChange={handleFocusGoalChange}
             onStudentSelect={handleStudentSelect}
             onBackToClasses={handleBackToClasses}
+            // General lesson props
+            generalLessonContent={generalLessonContent}
+            generalLessonFiles={generalLessonFiles}
+            onGeneralLessonChange={handleGeneralLessonChange}
+            personalizedContent={personalizedContent}
+            onProcessContent={handleProcessContent}
+            isProcessing={isProcessing}
           />
         )}
         
@@ -158,7 +266,13 @@ const App = () => {
             selectedStudent={selectedStudent}
             studentNotes={studentNotes}
             onNoteChange={handleNoteChange}
+            studentFocusGoals={studentFocusGoals}
+            onFocusGoalChange={handleFocusGoalChange}
             onBackToDashboard={handleBackToDashboard}
+            // General lesson props
+            generalLessonContent={generalLessonContent}
+            generalLessonFiles={generalLessonFiles}
+            personalizedContent={personalizedContent}
           />
         )}
       </div>

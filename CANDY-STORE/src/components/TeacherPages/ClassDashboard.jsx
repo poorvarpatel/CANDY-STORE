@@ -1,22 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Play, Settings, Users, Plus, Upload, FileText, Loader2 } from 'lucide-react';
-import GameRoomCreator from './GameRoomCreator';
 
 const ClassDashboard = ({ 
   selectedClass, 
   students, 
   studentNotes, 
   onNoteChange, 
+  studentFocusGoals,
+  onFocusGoalChange,
   onStudentSelect, 
-  onBackToClasses 
+  onBackToClasses,
+  // General lesson props
+  generalLessonContent,
+  generalLessonFiles,
+  onGeneralLessonChange,
+  personalizedContent,
+  onProcessContent,
+  isProcessing
 }) => {
   const [expandedNotes, setExpandedNotes] = useState({});
-  const [lessonContent, setLessonContent] = useState('');
-  const [uploadedFiles, setUploadedFiles] = useState([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [conceptSummary, setConceptSummary] = useState('');
-  const [studentGoals, setStudentGoals] = useState({});
-  const [showGameCreator, setShowGameCreator] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState(generalLessonFiles || []);
+
+  // Auto-sync uploaded files to parent
+  useEffect(() => {
+    onGeneralLessonChange(generalLessonContent, uploadedFiles);
+  }, [uploadedFiles]);
 
   const toggleNotes = (studentId) => {
     setExpandedNotes(prev => ({
@@ -34,104 +42,15 @@ const ClassDashboard = ({
     setUploadedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const processLessonContent = async () => {
-    setIsProcessing(true);
-    try {
-      // Combine uploaded files and text content
-      let contentToProcess = lessonContent;
-      
-      if (!contentToProcess.trim() && uploadedFiles.length > 0) {
-        contentToProcess = `Uploaded files: ${uploadedFiles.map(f => f.name).join(', ')}. Please process these files for educational content analysis.`;
-      }
-      
-      if (!contentToProcess.trim()) {
-        throw new Error('No content to process');
-      }
-
-      // Call backend API (will build this next)
-      const response = await fetch('http://localhost:3001/api/process-lesson', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          content: contentToProcess,
-          type: 'class', // Indicates this is for a class, not individual student
-          className: selectedClass?.name
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Backend API error: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (result.success && result.content) {
-        setConceptSummary(result.content);
-      } else {
-        throw new Error(result.error || 'Failed to process content');
-      }
-      
-    } catch (error) {
-      console.error('Error processing lesson:', error);
-      
-      // For now, show a helpful message about the backend
-      if (error.message.includes('fetch')) {
-        setConceptSummary(`⚠️ Backend not running yet!
-
-We'll build the backend next. For now, here's what the AI will generate:
-
-📚 Key Concepts Identified:
-1. Main topics from your lesson content
-2. Learning objectives
-3. Key facts and relationships
-4. 10-15 potential quiz questions
-
-✅ Next step: Create the backend API to process this content with real AI.
-
-Your content was: "${contentToProcess.substring(0, 100)}..."`);
-      } else {
-        setConceptSummary(`❌ Error: ${error.message}`);
-      }
-    } finally {
-      setIsProcessing(false);
-    }
+  const handleContentChange = (e) => {
+    // Auto-sync content changes to all students immediately
+    onGeneralLessonChange(e.target.value, uploadedFiles);
   };
 
-  const updateStudentGoal = (studentId, goal) => {
-    setStudentGoals(prev => ({
-      ...prev,
-      [studentId]: goal
-    }));
+  const handleProcessContent = async () => {
+    // Process content for all students using their individual data
+    await onProcessContent();
   };
-
-  const autoPopulateGoals = (studentId, shouldPopulate) => {
-    if (shouldPopulate) {
-      const notes = studentNotes[studentId] || '';
-      updateStudentGoal(studentId, notes);
-    } else {
-      updateStudentGoal(studentId, '');
-    }
-  };
-
-  const handleCreateRooms = (roomConfig) => {
-    console.log('🎮 Creating game rooms with config:', roomConfig);
-    // Here we'll add backend call to actually create rooms
-    setShowGameCreator(false);
-  };
-
-  // If showing game creator, render that instead
-  if (showGameCreator) {
-    return (
-      <GameRoomCreator
-        students={students}
-        conceptSummary={conceptSummary}
-        onCreateRooms={handleCreateRooms}
-        onBack={() => setShowGameCreator(false)}
-      />
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -149,10 +68,7 @@ Your content was: "${contentToProcess.substring(0, 100)}..."`);
               <h1 className="text-2xl font-bold text-gray-800">{selectedClass?.name}</h1>
             </div>
             <div className="flex space-x-3">
-              <button 
-                onClick={() => setShowGameCreator(true)}
-                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
-              >
+              <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2">
                 <Play className="w-4 h-4" />
                 <span>Create Game Rooms</span>
               </button>
@@ -168,7 +84,7 @@ Your content was: "${contentToProcess.substring(0, 100)}..."`);
         {/* Welcome Message */}
         <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl text-white p-6 mb-8">
           <h2 className="text-2xl font-bold mb-2">Ready to create engaging learning experiences?</h2>
-          <p className="text-indigo-100">Upload lesson content and create personalized quiz games for your students.</p>
+          <p className="text-indigo-100">Add general lesson content and process it to create personalized content for each student.</p>
         </div>
 
         {/* Quick Actions */}
@@ -185,21 +101,21 @@ Your content was: "${contentToProcess.substring(0, 100)}..."`);
           </div>
         </div>
 
-        {/* Lesson Plan Processor */}
+        {/* General Lesson Content */}
         <div className="bg-white rounded-xl shadow-sm mb-8">
           <div className="p-6 border-b border-gray-200">
             <h2 className="text-xl font-bold text-gray-800 flex items-center">
               <FileText className="w-5 h-5 mr-2" />
-              Lesson Plan Processor
+              General Lesson Content
             </h2>
-            <p className="text-gray-600 text-sm mt-1">Upload or paste lesson content for AI analysis</p>
+            <p className="text-gray-600 text-sm mt-1">Content here will automatically appear in all student profiles</p>
           </div>
           
           <div className="p-6 space-y-6">
             {/* File Upload */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Upload Files
+                Upload Files (Auto-syncs to all students)
               </label>
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-indigo-400 transition-colors">
                 <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
@@ -239,65 +155,53 @@ Your content was: "${contentToProcess.substring(0, 100)}..."`);
               )}
             </div>
 
-            {/* Text Input */}
+            {/* Text Input - Auto-syncs */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Or Paste Content
+                General Content (Auto-syncs to all students)
               </label>
               <textarea
-                value={lessonContent}
-                onChange={(e) => setLessonContent(e.target.value)}
-                placeholder="Paste your lesson content here..."
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y h-32"
+                value={generalLessonContent}
+                onChange={handleContentChange}
+                placeholder="Type your general lesson content here. This will automatically appear in all student profiles..."
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y h-40"
               />
+              <p className="text-xs text-gray-500 mt-1">✨ Auto-saves and syncs to all students as you type</p>
             </div>
 
-            {/* Process Button */}
-            <button
-              onClick={processLessonContent}
-              disabled={!lessonContent.trim() && uploadedFiles.length === 0}
-              className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Processing...</span>
-                </>
-              ) : (
-                <>
-                  <FileText className="w-4 h-4" />
-                  <span>Process Content</span>
-                </>
-              )}
-            </button>
-
-            {/* Concept Summary */}
-            {conceptSummary && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <h4 className="font-medium text-green-800 mb-2">AI-Generated Concept Summary</h4>
-                <pre className="text-sm text-green-700 whitespace-pre-wrap">{conceptSummary}</pre>
-                <div className="mt-4 flex space-x-3">
-                  <button 
-                    onClick={() => setShowGameCreator(true)}
-                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm"
-                  >
-                    Approve & Create Games
-                  </button>
-                  <button 
-                    onClick={processLessonContent}
-                    className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm"
-                  >
-                    Regenerate
-                  </button>
-                  <button 
-                    onClick={() => setConceptSummary('')}
-                    className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm"
-                  >
-                    Reject
-                  </button>
+            {/* Process Content Button */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="font-medium text-blue-800 mb-2">Create Personalized Content</h4>
+              <p className="text-sm text-blue-700 mb-4">
+                Process the general lesson content along with each student's notes and goals to create personalized learning content for every student.
+              </p>
+              <button
+                onClick={handleProcessContent}
+                disabled={!generalLessonContent.trim() && uploadedFiles.length === 0}
+                className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Creating Personalized Content...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-4 h-4" />
+                    <span>Process Content for All Students</span>
+                  </>
+                )}
+              </button>
+              
+              {personalizedContent && Object.keys(personalizedContent).length > 0 && (
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm text-green-700">
+                    ✅ Personalized content created for {Object.keys(personalizedContent).length} students. 
+                    Click on student names below to view their personalized content.
+                  </p>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
@@ -308,6 +212,9 @@ Your content was: "${contentToProcess.substring(0, 100)}..."`);
               <Users className="w-5 h-5 mr-2" />
               Students ({students.length})
             </h2>
+            {generalLessonContent && (
+              <p className="text-sm text-green-600 mt-1">✓ General lesson content is synced to all students</p>
+            )}
           </div>
           
           <div className="divide-y divide-gray-200">
@@ -322,6 +229,9 @@ Your content was: "${contentToProcess.substring(0, 100)}..."`);
                       {student.name}
                     </button>
                     <p className="text-gray-600 text-sm mt-1">{student.email}</p>
+                    {personalizedContent && personalizedContent[student.id] && (
+                      <p className="text-xs text-blue-600 mt-1">✨ Has personalized content ready</p>
+                    )}
                   </div>
                   
                   <button
@@ -337,6 +247,17 @@ Your content was: "${contentToProcess.substring(0, 100)}..."`);
                   <div className="mt-4 space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Learning Focus Goals
+                      </label>
+                      <textarea
+                        value={studentFocusGoals[student.id] || ''}
+                        onChange={(e) => onFocusGoalChange(student.id, e.target.value)}
+                        placeholder="Specific learning goals for this student (e.g., 'Focus on nucleus components from provided list')"
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y min-h-16"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
                         General Notes
                       </label>
                       <textarea
@@ -346,28 +267,7 @@ Your content was: "${contentToProcess.substring(0, 100)}..."`);
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y min-h-20"
                       />
                     </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Learning Focus Goals
-                        </label>
-                        <label className="flex items-center space-x-2 text-xs text-gray-600">
-                          <input
-                            type="checkbox"
-                            onChange={(e) => autoPopulateGoals(student.id, e.target.checked)}
-                            className="rounded text-indigo-600"
-                          />
-                          <span>Auto-populate from notes</span>
-                        </label>
-                      </div>
-                      <textarea
-                        value={studentGoals[student.id] || ''}
-                        onChange={(e) => updateStudentGoal(student.id, e.target.value)}
-                        placeholder="Specific learning goals for this student (e.g., 'Focus on nucleus components from provided list')"
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y min-h-16"
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500">Notes auto-save as you type</p>
+                    <p className="text-xs text-gray-500">Notes auto-save as you type and will be used to personalize content</p>
                   </div>
                 )}
               </div>
