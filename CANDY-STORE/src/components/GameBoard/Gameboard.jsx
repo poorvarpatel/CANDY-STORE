@@ -1,3 +1,4 @@
+// Updated GameBoard component with player animation
 import React, { useEffect, useRef, useState } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
@@ -6,7 +7,7 @@ import { addCastleToPath, createColoredCastle, createSimpleCastle } from '../Sce
 import { createPlayerBall } from '../SceneElements/Player';
 import GameQuestionBox from './GameQuestionBox';
 
-// Question parser to extract Q&A from AI-generated content
+// Question parser (keeping the same as before)
 const parseQuestions = (content) => {
   if (!content) return [];
   
@@ -29,16 +30,14 @@ const parseQuestions = (content) => {
         id: questionNumber++,
         text: line.replace(/^\d+\.\s*/, '').replace(/^Question\s*\d*:?\s*/i, ''),
         answers: [],
-        correctAnswer: 0 // Default to first answer
+        correctAnswer: 0
       };
     }
-    // Look for answer patterns (A), B), a., b., etc.)
     else if (line.match(/^[A-E][\.\)]/i) || line.match(/^[a-e][\.\)]/i)) {
       if (currentQuestion) {
         const answerText = line.replace(/^[A-Ea-e][\.\)]\s*/i, '');
         currentQuestion.answers.push(answerText);
         
-        // Simple heuristic for correct answer (longest or contains "correct" keywords)
         if (answerText.toLowerCase().includes('mitochondria') || 
             answerText.toLowerCase().includes('energy') ||
             answerText.toLowerCase().includes('power') ||
@@ -47,7 +46,6 @@ const parseQuestions = (content) => {
         }
       }
     }
-    // Look for standalone answers or numbered lists
     else if (line.match(/^-/) || line.match(/^\d+\)/)) {
       if (currentQuestion && currentQuestion.answers.length < 5) {
         const answerText = line.replace(/^[-\d+\)]\s*/, '');
@@ -56,12 +54,10 @@ const parseQuestions = (content) => {
     }
   }
   
-  // Add the last question
   if (currentQuestion && currentQuestion.answers.length >= 2) {
     questions.push(currentQuestion);
   }
   
-  // If no questions found, create sample questions
   if (questions.length === 0) {
     return [
       {
@@ -91,12 +87,11 @@ const parseQuestions = (content) => {
     ];
   }
   
-  // Ensure all questions have exactly 5 answers
   questions.forEach(q => {
     while (q.answers.length < 5) {
       q.answers.push("Additional option " + (q.answers.length + 1));
     }
-    q.answers = q.answers.slice(0, 5); // Limit to 5 answers
+    q.answers = q.answers.slice(0, 5);
   });
   
   return questions;
@@ -107,17 +102,15 @@ const GameBoard = ({
   includeCastle = true, 
   castleStyle = 'default',
   onClose,
-  onExitGame, // New prop for exiting game
+  onExitGame,
   gameData,
   studentName,
-  questionsData // New prop containing the educational content
+  questionsData
 }) => {
-  // Handle both direct pathTiles prop and gameData.pathTiles from StudentDashboard
   const actualPathTiles = pathTiles || gameData?.pathTiles || gameData?.customPath;
   const actualOnClose = onClose || onExitGame || (() => {});
   const isSOLOMode = gameData?.mode === 'practice' || gameData?.title?.includes('Solo');
   
-  // Parse questions from the educational content
   const questions = parseQuestions(questionsData || gameData?.personalizedContent);
   
   // Game state
@@ -128,19 +121,18 @@ const GameBoard = ({
     answeredQuestions: []
   });
   const [isCorrectAnswer, setIsCorrectAnswer] = useState(false);
-  const [gameMode, setGameMode] = useState('questions'); // 'questions' or 'completed'
+  const [gameMode, setGameMode] = useState('questions');
+  const [playerIsMoving, setPlayerIsMoving] = useState(false); // New state for tracking movement
   
-  // Generate path tiles based on number of questions (if not provided)
   const generatedPathTiles = actualPathTiles || Array.from({length: Math.max(questions.length, 10)}, (_, i) => ({
     x: i * 2,
     y: 0,
     id: i
   }));
 
-  // Current question
   const currentQuestion = questions[currentQuestionIndex];
   
-  // Handle answer selection
+  // Handle answer selection with animation
   const handleAnswerSelect = (answerIndex, colorKey) => {
     const correct = answerIndex === currentQuestion.correctAnswer;
     
@@ -158,28 +150,34 @@ const GameBoard = ({
     
     if (correct) {
       setIsCorrectAnswer(true);
-      console.log('🎉 Correct answer! Moving to next question...');
+      console.log('🎉 Correct answer! Player will move to next tile...');
       
-      // Move to next question after a delay
       setTimeout(() => {
         setIsCorrectAnswer(false);
         if (currentQuestionIndex < questions.length - 1) {
+          setPlayerIsMoving(true); // Start movement state
           setCurrentQuestionIndex(prev => prev + 1);
         } else {
           setGameMode('completed');
           console.log('🏆 Game completed!');
         }
-      }, 3000);
+      }, 1500); // Slightly shorter delay to feel more responsive
     } else {
       console.log('❌ Incorrect answer. Try again!');
     }
   };
   
-  // Handle question navigation
   const handleNavigateQuestion = (direction) => {
+    if (playerIsMoving) {
+      console.log('Player is moving, navigation disabled');
+      return;
+    }
+    
     if (direction === 'previous' && currentQuestionIndex > 0) {
+      setPlayerIsMoving(true);
       setCurrentQuestionIndex(prev => prev - 1);
     } else if (direction === 'next' && currentQuestionIndex < questions.length - 1) {
+      setPlayerIsMoving(true);
       setCurrentQuestionIndex(prev => prev + 1);
     }
   };
@@ -189,7 +187,9 @@ const GameBoard = ({
     const castleRef = useRef(null);
     const playerRef = useRef(null);
     const orbitControlsRef = useRef();
+    const path3DRef = useRef(null); // Store path for animations
     
+    // Effect for initial setup
     useEffect(() => {
       if (!pathTiles || pathTiles.length === 0) {
         console.warn('GameBoard: No pathTiles provided');
@@ -197,74 +197,30 @@ const GameBoard = ({
       }
 
       console.log('GameBoard: Creating board with', pathTiles.length, 'tiles');
-      console.log('GameBoard: Solo mode:', isSOLOMode);
       
-      // Create the tile board (all tiles including final one)
+      // Create the tile board
       const { tileMeshes, path3D } = createTileBoard(scene, pathTiles, {
         mode: 'game',
         includeEffects: true,
-        heightOffset: 5 // Push all tiles 5 units higher
+        heightOffset: 5
       });
       
+      path3DRef.current = path3D; // Store for animations
       console.log('GameBoard: Created', tileMeshes.length, 'tile meshes');
       
-      // Add a single player ball at the starting position (always just 1 for solo)
+      // Create player ball at starting position
       if (path3D.length > 0) {
-        const startPosition = path3D[currentQuestionIndex] ? path3D[currentQuestionIndex].position : path3D[0].position;
-        // Add slight height boost for player ball visibility
-        const playerPosition = [startPosition[0], startPosition[1] + 0.5, startPosition[2]];
-        const playerBall = createPlayerBall(playerPosition, { color: 0xff4444 }); // Red ball
-        scene.add(playerBall);
-        playerRef.current = playerBall;
+        const startPosition = path3D[0].position;
+        const playerBallObj = createPlayerBall(startPosition, { 
+          color: 0xff4444,
+          animationDuration: 2000,
+          arcHeight: 4
+        });
         
-        console.log('GameBoard: Added SOLO player ball at elevated position:', playerPosition);
+        scene.add(playerBallObj.mesh);
+        playerRef.current = playerBallObj;
         
-        // NOW position camera using the ACTUAL player position
-        const playerX = playerPosition[0];
-        const playerY = playerPosition[1];
-        const playerZ = playerPosition[2];
-        
-        // Find the next tile to point the camera toward
-        const nextTileIndex = Math.min(currentQuestionIndex + 1, path3D.length - 1);
-        const nextTile = path3D[nextTileIndex];
-        
-        // Calculate direction from player to next tile
-        const directionX = nextTile.position[0] - playerX;
-        const directionZ = nextTile.position[2] - playerZ;
-        
-        // Normalize the direction
-        const directionLength = Math.sqrt(directionX * directionX + directionZ * directionZ);
-        const normalizedX = directionLength > 0 ? directionX / directionLength : 0;
-        const normalizedZ = directionLength > 0 ? directionZ / directionLength : 1;
-        
-        // Position camera BEHIND and ABOVE the player for a good view of elevated content
-        const cameraDistance = 8;
-        camera.position.set(
-          playerX - (normalizedX * cameraDistance), // Opposite direction X
-          playerY + 2,                              // Above the elevated player
-          playerZ - (normalizedZ * cameraDistance)  // Opposite direction Z
-        );
-        
-        // Look toward the NEXT TILE at elevated position
-        camera.lookAt(
-          nextTile.position[0],     // Next tile X
-          nextTile.position[1] + 1, // Next tile Y (slightly above)
-          nextTile.position[2]      // Next tile Z
-        );
-        
-        // Update OrbitControls target to the elevated next tile
-        if (orbitControlsRef.current) {
-          orbitControlsRef.current.target.set(
-            nextTile.position[0], 
-            nextTile.position[1] + 1, 
-            nextTile.position[2]
-          );
-          orbitControlsRef.current.update();
-        }
-        
-        console.log('GameBoard: Direction to next tile:', normalizedX, normalizedZ);
-        console.log('GameBoard: Camera positioned behind player at:', camera.position);
-        console.log('GameBoard: Camera looking toward next tile at:', nextTile.position);
+        console.log('GameBoard: Added SOLO player ball at position:', startPosition);
       }
       
       // Add castle if requested
@@ -273,7 +229,6 @@ const GameBoard = ({
         const endPosition = path3D[path3D.length - 1].position;
         console.log('GameBoard: Adding castle at position', endPosition);
         
-        // Choose castle style
         try {
           switch (castleStyle) {
             case 'simple':
@@ -282,22 +237,21 @@ const GameBoard = ({
               break;
             case 'colorful':
               castle = createColoredCastle(endPosition, {
-                walls: 0x4a5568,    // Gray walls
-                roofs: 0xe53e3e,    // Red roofs  
-                details: 0xf6e05e   // Yellow details
+                walls: 0x4a5568,
+                roofs: 0xe53e3e,
+                details: 0xf6e05e
               });
               scene.add(castle);
               break;
             case 'royal':
               castle = createColoredCastle(endPosition, {
-                walls: 0x553c9a,    // Purple walls
-                roofs: 0xffd700,    // Gold roofs
-                details: 0xffffff   // White details
+                walls: 0x553c9a,
+                roofs: 0xffd700,
+                details: 0xffffff
               });
               scene.add(castle);
               break;
             default:
-              // Use the utility function that automatically adds to scene
               castle = addCastleToPath(scene, path3D);
               break;
           }
@@ -310,29 +264,24 @@ const GameBoard = ({
         }
       }
       
-      // Force a render update
       scene.updateMatrixWorld();
       
       // Cleanup function
       return () => {
         console.log('GameBoard: Cleaning up');
         
-        // Clean up player ball
         if (playerRef.current) {
-          scene.remove(playerRef.current);
+          playerRef.current.stopAnimation();
+          scene.remove(playerRef.current.mesh);
           playerRef.current.geometry.dispose();
           playerRef.current.material.dispose();
           playerRef.current = null;
-          console.log('GameBoard: Cleaned up player ball');
         }
         
-        // Clean up tiles
         cleanupTiles(scene, tileMeshes);
         
-        // Clean up castle
         if (castleRef.current) {
           scene.remove(castleRef.current);
-          
           castleRef.current.traverse((child) => {
             if (child.geometry) child.geometry.dispose();
             if (child.material) {
@@ -343,11 +292,84 @@ const GameBoard = ({
               }
             }
           });
-          
           castleRef.current = null;
         }
       };
-    }, [scene, camera, pathTiles, includeCastle, castleStyle, currentQuestionIndex]);
+    }, [scene, camera, pathTiles, includeCastle, castleStyle]);
+    
+    // Effect for handling player movement animations
+    useEffect(() => {
+      if (!playerRef.current || !path3DRef.current || path3DRef.current.length === 0) {
+        return;
+      }
+      
+      const targetPosition = path3DRef.current[currentQuestionIndex]?.position;
+      if (!targetPosition) {
+        console.warn('No target position found for question index:', currentQuestionIndex);
+        return;
+      }
+      
+      console.log('🚀 Animating player to question', currentQuestionIndex + 1);
+      
+      // Animate player to new position
+      playerRef.current.animateToPosition(
+        targetPosition,
+        () => {
+          // Animation complete callback
+          setPlayerIsMoving(false);
+          console.log('✅ Player reached destination for question', currentQuestionIndex + 1);
+          
+          // Update camera position to follow player
+          updateCameraForPosition(currentQuestionIndex);
+        },
+        {
+          duration: 2000,
+          arcHeight: 3 + (Math.abs(currentQuestionIndex - (currentQuestionIndex - 1)) * 1) // Higher arcs for longer jumps
+        }
+      );
+      
+    }, [currentQuestionIndex]);
+    
+    // Camera update function
+    const updateCameraForPosition = (questionIndex) => {
+      if (!path3DRef.current || !playerRef.current) return;
+      
+      const currentTile = path3DRef.current[questionIndex];
+      const nextTileIndex = Math.min(questionIndex + 1, path3DRef.current.length - 1);
+      const nextTile = path3DRef.current[nextTileIndex];
+      
+      if (!currentTile || !nextTile) return;
+      
+      const playerPos = currentTile.position;
+      const directionX = nextTile.position[0] - playerPos[0];
+      const directionZ = nextTile.position[2] - playerPos[2];
+      
+      const directionLength = Math.sqrt(directionX * directionX + directionZ * directionZ);
+      const normalizedX = directionLength > 0 ? directionX / directionLength : 0;
+      const normalizedZ = directionLength > 0 ? directionZ / directionLength : 1;
+      
+      const cameraDistance = 8;
+      camera.position.set(
+        playerPos[0] - (normalizedX * cameraDistance),
+        playerPos[1] + 3,
+        playerPos[2] - (normalizedZ * cameraDistance)
+      );
+      
+      camera.lookAt(
+        nextTile.position[0],
+        nextTile.position[1] + 1,
+        nextTile.position[2]
+      );
+      
+      if (orbitControlsRef.current) {
+        orbitControlsRef.current.target.set(
+          nextTile.position[0], 
+          nextTile.position[1] + 1, 
+          nextTile.position[2]
+        );
+        orbitControlsRef.current.update();
+      }
+    };
     
     return (
       <>
@@ -355,6 +377,7 @@ const GameBoard = ({
           ref={orbitControlsRef}
           enableDamping 
           dampingFactor={0.05}
+          enabled={!playerIsMoving} // Disable during movement for smoother experience
         />
       </>
     );
@@ -393,6 +416,7 @@ const GameBoard = ({
                 setCurrentQuestionIndex(0);
                 setGameStats({score: 0, totalAttempts: 0, answeredQuestions: []});
                 setGameMode('questions');
+                setPlayerIsMoving(false);
               }}
               className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700"
             >
@@ -412,6 +436,16 @@ const GameBoard = ({
 
   return (
     <div className="fixed inset-0 w-full h-screen bg-gray-900 z-50">
+      {/* Animation Status Indicator */}
+      {playerIsMoving && (
+        <div className="absolute top-1/2 left-6 bg-blue-600/90 rounded-lg p-4 text-white z-20 animate-pulse">
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-white rounded-full animate-bounce"></div>
+            <span className="text-sm font-bold">Player Moving...</span>
+          </div>
+        </div>
+      )}
+
       {/* Castle Style Controls */}
       {includeCastle && (
         <div className="absolute top-6 left-6 bg-black/50 rounded-lg p-3 text-white z-10">
@@ -425,22 +459,12 @@ const GameBoard = ({
         </div>
       )}
 
-      {/* Camera Info */}
-      <div className="absolute bottom-6 left-6 bg-black/50 rounded-lg p-3 text-white z-10">
-        <div className="text-sm font-bold mb-2">📷 Camera Control</div>
-        <div className="text-xs space-y-1">
-          <div>🎯 Behind player, pointing toward NEXT tile</div>
-          <div>👀 Follows the path direction dynamically</div>
-          <div>🖱️ Use mouse to orbit around player</div>
-          <div>⚙️ Scroll to zoom in/out</div>
-        </div>
-      </div>
-
       {/* Game Header */}
       <div className="absolute top-6 right-6 bg-black/50 rounded-lg p-3 text-white z-10">
         <div className="text-lg font-bold">🎮 {studentName}'s Quiz Adventure</div>
         <div className="text-sm">🎯 Answer questions to reach the castle!</div>
         <div className="text-sm">🔴 Question {currentQuestionIndex + 1} of {questions.length}</div>
+        {playerIsMoving && <div className="text-xs text-blue-300 animate-pulse">🏃 Player moving...</div>}
         {includeCastle && <div className="text-xs text-green-300">🏰 Castle: {castleStyle}</div>}
       </div>
 
@@ -449,6 +473,7 @@ const GameBoard = ({
         <button
           onClick={actualOnClose}
           className="text-white hover:text-gray-300 transition-colors"
+          disabled={playerIsMoving}
         >
           ← Exit Game
         </button>
@@ -465,8 +490,9 @@ const GameBoard = ({
           score: gameStats.score,
           totalAttempts: gameStats.totalAttempts
         }}
-        canGoBack={true}
+        canGoBack={!playerIsMoving} // Disable navigation during movement
         isCorrectAnswer={isCorrectAnswer}
+        disabled={playerIsMoving} // Pass disabled state to question box
       />
 
       <Canvas shadows camera={{ position: [0, 15, 25], fov: 60 }}>

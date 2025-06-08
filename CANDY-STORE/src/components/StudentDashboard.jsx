@@ -1,58 +1,84 @@
 import React, { useState } from 'react';
 import { Play, Calendar, Target, Trophy, Users, BookOpen, Clock } from 'lucide-react';
 import GameBoard from './GameBoard/Gameboard';
-import PathCreator from './PathCreator/PathCreator'; // Add this import
+import PathCreator from './PathCreator/PathCreator';
 
 const StudentDashboard = ({ 
   studentName = "Emma Davis",
-  assignedQuizzes = [], // 🔗 NEW: Receive assigned quizzes from teacher
-  onQuizComplete // 🔗 NEW: Callback when quiz is completed
+  assignedQuizzes = [], // Receive assigned quizzes from teacher
+  onQuizComplete // Callback when quiz is completed
 }) => {
   const [selectedTab, setSelectedTab] = useState('assigned');
   const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard', 'pathCreator', 'gameBoard'
   const [currentGame, setCurrentGame] = useState(null);
-  const [customPath, setCustomPath] = useState(null); // Store the custom path
+  const [customPath, setCustomPath] = useState(null);
 
+  // Enhanced game handling with better content flow - ALL GAMES go through PathCreator
   const handleJoinGame = (game) => {
+    console.log('🎮 StudentDashboard: Starting game:', game);
+    
     if (game.type === 'personalized') {
-      // 🔗 NEW: For personalized quizzes, we have the content already
+      // For personalized quizzes assigned by teacher
+      console.log('📚 Personalized quiz content:', game.content ? 'Present' : 'Missing');
+      
       setCurrentGame({
         ...game,
         mode: 'assigned',
-        questionsData: game.content,
-        title: game.title
+        questionsData: game.content, // This is the key - pass the content as questionsData
+        personalizedContent: game.content, // Also keep as personalizedContent for backward compatibility
+        title: game.title,
+        studentName: studentName,
+        isPersonalized: true
       });
     } else {
       // For group games, proceed normally
-      setCurrentGame(game);
+      setCurrentGame({
+        ...game,
+        mode: 'group',
+        studentName: studentName
+      });
     }
-    setCurrentView('pathCreator'); // Show PathCreator instead of GameBoard
+    
+    // 🔧 FIXED: ALL games (including personalized) go through PathCreator
+    setCurrentView('pathCreator');
   };
 
   const handleStartPractice = (game) => {
-    setCurrentGame({ ...game, mode: 'practice' });
-    setCurrentView('pathCreator'); // Show PathCreator for practice too
+    console.log('🏃 StudentDashboard: Starting practice mode:', game);
+    
+    setCurrentGame({ 
+      ...game, 
+      mode: 'practice',
+      studentName: studentName
+    });
+    setCurrentView('pathCreator'); // Show PathCreator for practice
   };
 
   const handlePathComplete = (pathTiles) => {
+    console.log('🛣️ StudentDashboard: Path creation complete, tiles:', pathTiles.length);
+    
     // Called when user finishes creating their path
     setCustomPath(pathTiles);
     setCurrentView('gameBoard'); // Now show the GameBoard with the custom path
   };
 
   const handleClosePathCreator = () => {
+    console.log('❌ StudentDashboard: Closing path creator');
     setCurrentView('dashboard');
     setCurrentGame(null);
   };
 
   const handleCloseGame = () => {
-    // 🔗 NEW: Handle quiz completion
+    console.log('🏁 StudentDashboard: Game closing');
+    
+    // Handle quiz completion for personalized quizzes
     if (currentGame?.type === 'personalized' && onQuizComplete) {
       const results = {
         score: 85, // This would come from actual gameplay
         completed: true,
         completedAt: new Date().toISOString()
       };
+      console.log('📊 Completing personalized quiz:', currentGame.id, results);
       onQuizComplete(currentGame.id, results);
     }
     
@@ -67,20 +93,30 @@ const StudentDashboard = ({
       <PathCreator 
         onClose={handleClosePathCreator}
         onGameStart={handlePathComplete}
+        gameData={currentGame} // 🔗 PASS gameData to PathCreator
       />
     );
   }
 
   // Show GameBoard when playing
   if (currentView === 'gameBoard') {
+    console.log('🎯 StudentDashboard: Rendering GameBoard with data:', {
+      hasCustomPath: !!customPath,
+      gameMode: currentGame?.mode,
+      hasQuestionsData: !!(currentGame?.questionsData || currentGame?.content),
+      gameTitle: currentGame?.title
+    });
+    
     return (
       <GameBoard 
         onClose={handleCloseGame}
         gameData={{
           ...currentGame,
-          customPath: customPath, // Pass the custom path to GameBoard
+          customPath: customPath, // Pass the custom path
           pathTiles: customPath
         }}
+        // 🔗 KEY FIX: Explicitly pass questionsData for personalized quizzes
+        questionsData={currentGame?.questionsData || currentGame?.content}
         studentName={studentName}
       />
     );
@@ -88,14 +124,12 @@ const StudentDashboard = ({
 
   // Mock student data with consistent calendar
   const getStudentCalendarData = (studentName) => {
-    // Create consistent activity data based on student name (so it doesn't change)
     const seed = studentName.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
-    const activityDates = [1, 3, 6, 8, 10, 12, 15, 17, 19, 22]; // Fixed activity dates
+    const activityDates = [1, 3, 6, 8, 10, 12, 15, 17, 19, 22];
     
     const calendarData = {};
     activityDates.forEach(day => {
-      // Use seed to generate consistent question counts
-      const baseCount = Math.floor(((seed + day) % 100) / 4) + 8; // 8-33 questions
+      const baseCount = Math.floor(((seed + day) % 100) / 4) + 8;
       calendarData[day] = day === 6 ? 24 : day === 19 ? 22 : baseCount;
     });
     
@@ -104,7 +138,7 @@ const StudentDashboard = ({
 
   const studentCalendarData = getStudentCalendarData(studentName);
   
-  // 🔗 UPDATED: Combine mock assignments with real assigned quizzes
+  // Mock assigned games
   const mockAssignedGames = [
     {
       id: 1,
@@ -130,15 +164,23 @@ const StudentDashboard = ({
     }
   ];
 
-  // 🔗 NEW: Combine mock games with assigned personalized quizzes
+  // 🔗 ENHANCED: Combine mock games with assigned personalized quizzes
   const allAssignedGames = [
-    ...assignedQuizzes.map(quiz => ({
-      ...quiz,
-      type: "personalized",
-      dueDate: new Date(quiz.dueDate).toLocaleDateString()
-    })),
+    ...assignedQuizzes.map(quiz => {
+      console.log('📋 Processing assigned quiz:', quiz.title, 'Content present:', !!quiz.content);
+      return {
+        ...quiz,
+        type: "personalized",
+        dueDate: new Date(quiz.dueDate).toLocaleDateString(),
+        // Ensure content is properly preserved
+        content: quiz.content || quiz.personalizedContent,
+        questionsData: quiz.content || quiz.personalizedContent
+      };
+    }),
     ...mockAssignedGames
   ];
+
+  console.log('📚 StudentDashboard: All assigned games:', allAssignedGames.length, 'total');
 
   const mockSuggestedGames = [
     {
@@ -181,7 +223,6 @@ const StudentDashboard = ({
               <div>
                 <h1 className="text-2xl font-bold text-gray-800">Welcome back, {studentName}! 🎓</h1>
                 <p className="text-gray-600">
-                  {/* 🔗 NEW: Show notification for assigned quizzes */}
                   {assignedQuizzes.length > 0 && (
                     <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-sm mr-2">
                       🎯 {assignedQuizzes.length} personalized quiz{assignedQuizzes.length !== 1 ? 'zes' : ''} assigned!
@@ -248,7 +289,6 @@ const StudentDashboard = ({
                 <Clock className="w-6 h-6 text-orange-600" />
               </div>
               <div>
-                {/* 🔗 NEW: Show total due assignments */}
                 <p className="text-2xl font-bold text-gray-800">{allAssignedGames.length}</p>
                 <p className="text-sm text-gray-600">Due Today</p>
               </div>
@@ -290,7 +330,6 @@ const StudentDashboard = ({
                     <div className="flex items-center justify-center space-x-2">
                       <Users className="w-5 h-5" />
                       <span>Assigned Learning</span>
-                      {/* 🔗 NEW: Show assignment count */}
                       {allAssignedGames.length > 0 && (
                         <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
                           {allAssignedGames.length}
@@ -317,14 +356,12 @@ const StudentDashboard = ({
                 {selectedTab === 'assigned' ? (
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-gray-800 mb-4">Your Assignments</h3>
-                    {/* 🔗 NEW: Show all assigned games including personalized quizzes */}
                     {allAssignedGames.map(game => (
                       <div key={game.id} className={`border rounded-lg p-4 hover:shadow-md transition-shadow ${
                         game.type === 'personalized' ? 'border-purple-300 bg-purple-50' : 'border-gray-200'
                       }`}>
                         <div className="flex items-center justify-between mb-3">
                           <h4 className="text-lg font-semibold text-gray-800 flex items-center">
-                            {/* 🔗 NEW: Special indicator for personalized quizzes */}
                             {game.type === 'personalized' && <span className="mr-2">🎯</span>}
                             {game.title}
                           </h4>
@@ -335,7 +372,7 @@ const StudentDashboard = ({
                           </span>
                         </div>
                         
-                        {/* 🔗 NEW: Special section for personalized quizzes */}
+                        {/* Enhanced personalized quiz section */}
                         {game.type === 'personalized' && (
                           <div className="mb-3 p-3 bg-white rounded border border-purple-200">
                             <p className="text-sm text-purple-700 font-medium">
@@ -346,6 +383,10 @@ const StudentDashboard = ({
                                 Focus: {game.focusAreas}
                               </p>
                             )}
+                            {/* Debug info for testing */}
+                            <p className="text-xs text-purple-500 mt-1">
+                              ✓ Content ready: {game.content ? 'Yes' : 'No'}
+                            </p>
                           </div>
                         )}
                         
@@ -366,8 +407,7 @@ const StudentDashboard = ({
                           >
                             <Play className="w-4 h-4" />
                             <span>
-                              {/* 🔗 NEW: Different button text for personalized quizzes */}
-                              {game.type === 'personalized' ? '🎯 Start Personalized Quiz' : '🎨 Create & Join Game'}
+                              {game.type === 'personalized' ? '🎯 Create Board & Start Quiz!' : '🎨 Create & Join Game'}
                             </span>
                           </button>
                           {game.type !== 'personalized' && (

@@ -3,13 +3,25 @@ import * as THREE from 'three';
 import { createTileBoard, cleanupTiles } from '../SceneElements/Tiles';
 import { addCastleToPath } from '../SceneElements/Castle';
 
-const PathTo3DBoard = ({ pathTiles, onClose, onStartGame }) => {
+const PathTo3DBoard = ({ 
+  pathTiles, 
+  onClose, 
+  onStartGame, 
+  gameData = null // NEW: Receive game data from PathCreator
+}) => {
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
   const rendererRef = useRef(null);
   const cameraRef = useRef(null);
   const isInitializedRef = useRef(false);
   const tilesRef = useRef([]);
+  
+  console.log('🎯 PathTo3DBoard: Initialized with gameData:', {
+    hasGameData: !!gameData,
+    gameTitle: gameData?.title,
+    isPersonalized: gameData?.isPersonalized,
+    hasContent: !!(gameData?.questionsData || gameData?.content)
+  });
   
   // Orbit controls state
   const orbitStateRef = useRef({
@@ -33,7 +45,7 @@ const PathTo3DBoard = ({ pathTiles, onClose, onStartGame }) => {
       return;
     }
 
-    console.log('Creating 3D board from path with', pathTiles.length, 'tiles');
+    console.log('🏗️ PathTo3DBoard: Creating 3D board from path with', pathTiles.length, 'tiles');
     isInitializedRef.current = true;
 
     // Hide body scroll bars
@@ -79,7 +91,7 @@ const PathTo3DBoard = ({ pathTiles, onClose, onStartGame }) => {
     const castle = addCastleToPath(scene, path3D);
     
     tilesRef.current = tileMeshes;
-    console.log('PathTo3DBoard: Created 3D path with', path3D.length, 'tiles and castle');
+    console.log('🏰 PathTo3DBoard: Created 3D path with', path3D.length, 'tiles and castle');
 
     // Position camera to view the entire path
     if (path3D.length > 0) {
@@ -162,7 +174,7 @@ const PathTo3DBoard = ({ pathTiles, onClose, onStartGame }) => {
 
     // Cleanup
     return () => {
-      console.log('Cleaning up 3D board...');
+      console.log('🧹 PathTo3DBoard: Cleaning up 3D board...');
       isInitializedRef.current = false;
       
       // Use centralized cleanup for tiles
@@ -227,6 +239,19 @@ const PathTo3DBoard = ({ pathTiles, onClose, onStartGame }) => {
     }
   };
 
+  // ENHANCED: Handle game start with proper data flow
+  const handleGameStart = () => {
+    console.log('🚀 PathTo3DBoard: Starting game with gameData:', {
+      pathTilesLength: pathTiles.length,
+      gameTitle: gameData?.title,
+      hasContent: !!(gameData?.questionsData || gameData?.content)
+    });
+    
+    if (onStartGame) {
+      onStartGame(); // This calls back to PathCreator
+    }
+  };
+
   if (!pathTiles || pathTiles.length === 0) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-gray-100">
@@ -251,19 +276,29 @@ const PathTo3DBoard = ({ pathTiles, onClose, onStartGame }) => {
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/50 to-transparent z-10">
         <div className="flex justify-between items-center text-white">
-          <h1 className="text-3xl font-bold">
-            🏰 Your Custom 3D Game Board
-          </h1>
+          <div>
+            <h1 className="text-3xl font-bold">
+              🏰 Your Custom 3D Game Board
+            </h1>
+            {/* Enhanced game info display */}
+            {gameData?.isPersonalized && (
+              <div className="mt-2 bg-purple-600/80 rounded-lg px-3 py-1 inline-block">
+                <span className="text-sm font-medium">🎯 {gameData.title}</span>
+              </div>
+            )}
+          </div>
           <div className="flex items-center space-x-4">
             <div className="text-right">
               <p className="text-lg">Path Length: <span className="font-bold">{pathTiles.length} tiles</span></p>
-              <p className="text-sm opacity-80">Ready to play!</p>
+              <p className="text-sm opacity-80">
+                {gameData?.isPersonalized ? '🎯 Personalized questions ready!' : 'Ready to play!'}
+              </p>
             </div>
             <button 
               onClick={onClose}
               className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors"
             >
-              ✕ Back to Dashboard
+              ✕ Back to Drawing
             </button>
           </div>
         </div>
@@ -287,17 +322,36 @@ const PathTo3DBoard = ({ pathTiles, onClose, onStartGame }) => {
 
       {/* Game Ready Status */}
       <div className="absolute bottom-6 left-6 right-6 z-10">
-        <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center max-w-2xl mx-auto">
-          <h3 className="text-xl font-bold text-green-800 mb-2">🎉 3D Board Created!</h3>
-          <p className="text-green-700 mb-4">
+        <div className={`border rounded-lg p-6 text-center max-w-2xl mx-auto ${
+          gameData?.isPersonalized 
+            ? 'bg-purple-50 border-purple-200' 
+            : 'bg-green-50 border-green-200'
+        }`}>
+          <h3 className={`text-xl font-bold mb-2 ${
+            gameData?.isPersonalized ? 'text-purple-800' : 'text-green-800'
+          }`}>
+            🎉 3D Board Created!
+          </h3>
+          <p className={`mb-4 ${
+            gameData?.isPersonalized ? 'text-purple-700' : 'text-green-700'
+          }`}>
             Your custom path has been transformed into a beautiful 3D game board with {pathTiles.length} tiles!
+            {gameData?.isPersonalized && (
+              <span className="block font-medium mt-1">
+                🎯 Your personalized questions from {gameData.teacher || 'your teacher'} are ready!
+              </span>
+            )}
           </p>
           <div className="flex justify-center gap-4">
             <button
-              onClick={() => onStartGame?.(pathTiles)}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-lg font-bold text-lg animate-pulse"
+              onClick={handleGameStart}
+              className={`text-white px-8 py-3 rounded-lg font-bold text-lg animate-pulse ${
+                gameData?.isPersonalized 
+                  ? 'bg-purple-600 hover:bg-purple-700' 
+                  : 'bg-purple-600 hover:bg-purple-700'
+              }`}
             >
-              🚀 Start Educational Game!
+              🚀 {gameData?.isPersonalized ? 'Start Personalized Quiz!' : 'Start Educational Game!'}
             </button>
             <button
               onClick={onClose}

@@ -4,12 +4,24 @@ import DrawingCanvas from './DrawingCanvas';
 import PathTo3DBoard from './PathTo3DBoard';
 import GameBoard from '../GameBoard/Gameboard';
 
-// Main PathCreator component
-const PathCreator = ({ onClose, onGameStart }) => {
+// Main PathCreator component - FIXED to properly pass game data through the flow
+const PathCreator = ({ 
+  onClose, 
+  onGameStart, 
+  gameData = null // NEW: Receive game data from StudentDashboard
+}) => {
   const [currentLength, setCurrentLength] = useState(0);
   const [pathTiles, setPathTiles] = useState([]);
   const [isPathComplete, setIsPathComplete] = useState(false);
   const [currentView, setCurrentView] = useState('drawing'); // 'drawing', '3d-preview', 'game'
+  
+  console.log('🎨 PathCreator: Initialized with gameData:', {
+    hasGameData: !!gameData,
+    gameTitle: gameData?.title,
+    gameMode: gameData?.mode,
+    hasContent: !!(gameData?.questionsData || gameData?.content),
+    isPersonalized: gameData?.isPersonalized
+  });
   
   const handlePathUpdate = (length, tiles) => {
     setCurrentLength(length);
@@ -19,7 +31,7 @@ const PathCreator = ({ onClose, onGameStart }) => {
   const handlePathComplete = (tiles) => {
     setIsPathComplete(true);
     setPathTiles(tiles);
-    console.log('Path completed with tiles:', tiles);
+    console.log('🛣️ PathCreator: Path completed with', tiles.length, 'tiles');
   };
   
   const handleReset = () => {
@@ -30,12 +42,18 @@ const PathCreator = ({ onClose, onGameStart }) => {
   };
 
   const handleShow3D = () => {
+    console.log('🎯 PathCreator: Moving to 3D preview with game data');
     setCurrentView('3d-preview');
   };
 
   const handleStartGame = () => {
-    console.log('PathCreator: Starting game with', pathTiles.length, 'tiles');
+    console.log('🚀 PathCreator: Starting game with', pathTiles.length, 'tiles and game data:', gameData?.title);
     setCurrentView('game');
+    
+    // Call the parent's onGameStart if provided (for compatibility)
+    if (onGameStart) {
+      onGameStart(pathTiles);
+    }
   };
 
   const handleBackToDrawing = () => {
@@ -48,11 +66,25 @@ const PathCreator = ({ onClose, onGameStart }) => {
 
   // Render current view
   if (currentView === 'game') {
+    console.log('🎮 PathCreator: Rendering GameBoard with:', {
+      pathTilesLength: pathTiles.length,
+      gameDataPresent: !!gameData,
+      questionsData: !!(gameData?.questionsData || gameData?.content),
+      studentName: gameData?.studentName
+    });
+    
     return (
       <GameBoard 
         pathTiles={pathTiles} 
         onClose={handleBackToPreview}
-        studentName="Player"
+        gameData={{
+          ...gameData,
+          customPath: pathTiles,
+          pathTiles: pathTiles
+        }}
+        // 🔗 IMPORTANT: Pass questionsData explicitly for personalized quizzes
+        questionsData={gameData?.questionsData || gameData?.content}
+        studentName={gameData?.studentName || "Player"}
       />
     );
   }
@@ -63,6 +95,7 @@ const PathCreator = ({ onClose, onGameStart }) => {
         pathTiles={pathTiles} 
         onClose={handleBackToDrawing}
         onStartGame={handleStartGame}
+        gameData={gameData} // 🔗 PASS game data to 3D preview
       />
     );
   }
@@ -71,11 +104,38 @@ const PathCreator = ({ onClose, onGameStart }) => {
   return (
     <div className="fixed inset-0 bg-white z-40 overflow-auto">
       <div className="max-w-4xl mx-auto p-6 space-y-6">
-        {/* Header with back button */}
+        {/* Header with back button and game info */}
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2">🎨 Create Your Game Board</h1>
-            <p className="text-gray-600">Draw a custom path for your educational adventure!</p>
+            <p className="text-gray-600">
+              {gameData?.isPersonalized ? (
+                <>🎯 Draw a custom path for your <span className="font-semibold text-purple-600">personalized quiz: {gameData.title}</span></>
+              ) : gameData?.title ? (
+                <>Draw a custom path for: <span className="font-semibold">{gameData.title}</span></>
+              ) : (
+                "Draw a custom path for your educational adventure!"
+              )}
+            </p>
+            
+            {/* Show game type indicator */}
+            {gameData && (
+              <div className="mt-2 flex items-center space-x-2">
+                {gameData.isPersonalized && (
+                  <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-medium">
+                    🎯 Personalized Content Ready
+                  </span>
+                )}
+                <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium">
+                  Mode: {gameData.mode || 'Practice'}
+                </span>
+                {gameData.difficulty && (
+                  <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
+                    {gameData.difficulty}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           <button 
             onClick={onClose}
@@ -97,6 +157,11 @@ const PathCreator = ({ onClose, onGameStart }) => {
             <h3 className="text-xl font-bold text-green-800 mb-2">🚀 Ready to Build!</h3>
             <p className="text-green-700 mb-4">
               Your path has {pathTiles.length} tiles and is ready to become a 3D game board!
+              {gameData?.isPersonalized && (
+                <span className="block text-purple-700 font-medium mt-1">
+                  🎯 Your personalized questions are ready to be added to the board!
+                </span>
+              )}
             </p>
             <button
               onClick={handleShow3D}
@@ -114,6 +179,9 @@ const PathCreator = ({ onClose, onGameStart }) => {
             <li>The system converts your drawing into evenly-spaced game tiles</li>
             <li>Progress bar shows if your path is the right length (40-100 tiles)</li>
             <li>Preview your 3D board, then start the 5-color educational game!</li>
+            {gameData?.isPersonalized && (
+              <li className="text-purple-700 font-medium">🎯 Your personalized questions will be used in the game!</li>
+            )}
           </ul>
         </div>
       </div>
