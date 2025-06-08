@@ -5,7 +5,19 @@ import { createTileBoard, cleanupTiles } from '../SceneElements/Tiles';
 import { addCastleToPath, createColoredCastle, createSimpleCastle } from '../SceneElements/Castle';
 import { createPlayerBall } from '../SceneElements/Player';
 
-const GameBoard = ({ pathTiles, includeCastle = true, castleStyle = 'default' }) => {
+const GameBoard = ({ 
+  pathTiles, 
+  includeCastle = true, 
+  castleStyle = 'default',
+  onClose,
+  gameData,
+  studentName 
+}) => {
+  // Handle both direct pathTiles prop and gameData.pathTiles from StudentDashboard
+  const actualPathTiles = pathTiles || gameData?.pathTiles || gameData?.customPath;
+  const actualOnClose = onClose || (() => {});
+  const isSOLOMode = gameData?.mode === 'practice' || gameData?.title?.includes('Solo');
+  
   const TileBoard = ({ pathTiles, includeCastle, castleStyle }) => {
     const { scene, camera } = useThree();
     const castleRef = useRef(null);
@@ -19,6 +31,7 @@ const GameBoard = ({ pathTiles, includeCastle = true, castleStyle = 'default' })
       }
 
       console.log('GameBoard: Creating board with', pathTiles.length, 'tiles');
+      console.log('GameBoard: Solo mode:', isSOLOMode);
       
       // Create the tile board (all tiles including final one)
       const { tileMeshes, path3D } = createTileBoard(scene, pathTiles, {
@@ -28,14 +41,14 @@ const GameBoard = ({ pathTiles, includeCastle = true, castleStyle = 'default' })
       
       console.log('GameBoard: Created', tileMeshes.length, 'tile meshes');
       
-      // Add a single player ball at the starting position
+      // Add a single player ball at the starting position (always just 1 for solo)
       if (path3D.length > 0) {
         const startPosition = path3D[0].position;
         const playerBall = createPlayerBall(startPosition, { color: 0xff4444 }); // Red ball
         scene.add(playerBall);
         playerRef.current = playerBall;
         
-        console.log('GameBoard: Added player ball at start position:', startPosition);
+        console.log('GameBoard: Added SOLO player ball at start position:', startPosition);
         
         // NOW position camera using the ACTUAL player position
         const playerX = startPosition[0];
