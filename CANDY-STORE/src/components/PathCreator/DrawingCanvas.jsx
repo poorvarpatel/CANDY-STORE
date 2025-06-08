@@ -169,49 +169,6 @@ const DrawingCanvas = ({ onPathUpdate, onPathComplete }) => {
   
   return tiles;
 };
-
-  // const processPath = (pathPoints) => {
-  //   if (pathPoints.length < 2) return [];
-    
-  //   const tiles = [];
-  //   const tileSpacing = 12;
-  //   let totalDistance = 0;
-    
-  //   for (let i = 1; i < pathPoints.length; i++) {
-  //     const dx = pathPoints[i].x - pathPoints[i-1].x;
-  //     const dy = pathPoints[i].y - pathPoints[i-1].y;
-  //     totalDistance += Math.sqrt(dx * dx + dy * dy);
-  //   }
-    
-  //   let currentDistance = 0;
-  //   let pathIndex = 1;
-  //   let segmentDistance = 0;
-    
-  //   while (currentDistance < totalDistance && pathIndex < pathPoints.length) {
-  //     while (pathIndex < pathPoints.length) {
-  //       const dx = pathPoints[pathIndex].x - pathPoints[pathIndex-1].x;
-  //       const dy = pathPoints[pathIndex].y - pathPoints[pathIndex-1].y;
-  //       const segmentLength = Math.sqrt(dx * dx + dy * dy);
-        
-  //       if (segmentDistance + segmentLength >= currentDistance) {
-  //         const t = (currentDistance - segmentDistance) / segmentLength;
-  //         const x = pathPoints[pathIndex-1].x + t * dx;
-  //         const y = pathPoints[pathIndex-1].y + t * dy;
-          
-  //         tiles.push({ x, y, index: tiles.length });
-  //         currentDistance += tileSpacing;
-  //         break;
-  //       }
-        
-  //       segmentDistance += segmentLength;
-  //       pathIndex++;
-  //     }
-      
-  //     if (pathIndex >= pathPoints.length) break;
-  //   }
-    
-  //   return tiles;
-  // };
   
   const startDrawing = (e) => {
     if (isComplete) return;
