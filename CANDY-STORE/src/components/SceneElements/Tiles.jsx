@@ -69,13 +69,35 @@ export function convertPathTo3D(path2D, options = {}) {
 
   if (!path2D || path2D.length === 0) return { path3D: [], colorSequence: [], isValid: true };
 
+  console.log('convertPathTo3D: Processing', path2D.length, 'input tiles');
+  
+  // Filter out invalid coordinates and log them
+  const validPath2D = path2D.filter((point, index) => {
+    const x = point.x ?? point[0];
+    const y = point.y ?? point[1];
+    const isValid = !isNaN(x) && !isNaN(y) && isFinite(x) && isFinite(y);
+    
+    if (!isValid) {
+      console.warn('convertPathTo3D: Skipping invalid tile', index, ':', point);
+    }
+    
+    return isValid;
+  });
+  
+  console.log('convertPathTo3D: Using', validPath2D.length, 'valid tiles after filtering');
+  
+  if (validPath2D.length === 0) {
+    console.error('convertPathTo3D: No valid tiles found!');
+    return { path3D: [], colorSequence: [], isValid: false };
+  }
+
   const colorSet = COLOR_SETS[mode];
-  const colorSequence = generateColorSequence(path2D.length, colorSet);
+  const colorSequence = generateColorSequence(validPath2D.length, colorSet);
   const isValid = validateColorSequence(colorSequence, colorSet);
 
   // Normalize path coordinates
-  const xs = path2D.map(p => p.x ?? p[0]);
-  const ys = path2D.map(p => p.y ?? p[1]);
+  const xs = validPath2D.map(p => p.x ?? p[0]);
+  const ys = validPath2D.map(p => p.y ?? p[1]);
   const xMin = Math.min(...xs);
   const xMax = Math.max(...xs);
   const yMin = Math.min(...ys);
@@ -83,16 +105,18 @@ export function convertPathTo3D(path2D, options = {}) {
   const xRange = xMax - xMin || 1;
   const yRange = yMax - yMin || 1;
 
+  console.log('convertPathTo3D: Coordinate bounds:', { xMin, xMax, yMin, yMax });
+
   const path3D = [];
 
-  path2D.forEach((point2D, index) => {
+  validPath2D.forEach((point2D, index) => {
     const x = ((point2D.x ?? point2D[0]) - xMin - xRange / 2) * scale;
     const z = ((point2D.y ?? point2D[1]) - yMin - yRange / 2) * scale;
     
     // Calculate height
     let y = 0;
     if (heightVariation) {
-      const progress = index / path2D.length;
+      const progress = index / validPath2D.length;
       y += progress * 8; // Rise toward the end
       y += Math.sin(progress * 4 * Math.PI) * 1.5; // Wave pattern
       y += (Math.random() - 0.5) * 0.5; // Random variation
@@ -103,7 +127,7 @@ export function convertPathTo3D(path2D, options = {}) {
     let colorKey = colorSequence[index];
 
     if (includeSpecialTiles && mode === 'preview') {
-      if (index === path2D.length - 1) {
+      if (index === validPath2D.length - 1) {
         tileType = 'rainbow';
         colorKey = 'rainbow';
       } else if (index > 10 && Math.random() < 0.05) {
@@ -125,9 +149,15 @@ export function convertPathTo3D(path2D, options = {}) {
       colorValue: colorData.hex,
       colorName: colorData.name,
       isStart: index === 0,
-      isEnd: index === path2D.length - 1
+      isEnd: index === validPath2D.length - 1
     });
   });
+
+  console.log('convertPathTo3D: Created', path3D.length, '3D tiles');
+  if (path3D.length > 0) {
+    console.log('convertPathTo3D: First tile:', path3D[0].position);
+    console.log('convertPathTo3D: Last tile:', path3D[path3D.length - 1].position);
+  }
 
   return { path3D, colorSequence, isValid };
 }
@@ -188,53 +218,7 @@ export function createTileMesh(tileData, options = {}) {
   return mesh;
 }
 
-// Create castle for end position (preview mode)
-export function createCastle(scene, position) {
-  const group = new THREE.Group();
-  
-  // Main castle structure
-  const castleGeometry = new THREE.CylinderGeometry(4, 5, 5, 12);
-  const castleMaterial = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
-  const castle = new THREE.Mesh(castleGeometry, castleMaterial);
-  castle.position.y = 2.5;
-  group.add(castle);
-  
-  // Towers around the castle
-  for (let t = 0; t < 6; t++) {
-    const angle = (t / 6) * Math.PI * 2;
-    const towerGeo = new THREE.CylinderGeometry(0.8, 0.8, 4, 12);
-    const tower = new THREE.Mesh(towerGeo, castleMaterial);
-    tower.position.x = Math.cos(angle) * 4.5;
-    tower.position.z = Math.sin(angle) * 4.5;
-    tower.position.y = 4;
-    group.add(tower);
-    
-    const roofGeo = new THREE.ConeGeometry(1.2, 2, 12);
-    const roofMat = new THREE.MeshLambertMaterial({ color: 0xff0000 });
-    const roof = new THREE.Mesh(roofGeo, roofMat);
-    roof.position.copy(tower.position);
-    roof.position.y += 2.5;
-    group.add(roof);
-  }
-  
-  // Central spire
-  const spireGeo = new THREE.CylinderGeometry(0.3, 0.5, 10, 12);
-  const spireMat = new THREE.MeshLambertMaterial({ color: 0xffd700 });
-  const spire = new THREE.Mesh(spireGeo, spireMat);
-  spire.position.y = 7.5;
-  group.add(spire);
-  
-  const crownGeo = new THREE.ConeGeometry(1.5, 3, 12);
-  const crownMat = new THREE.MeshLambertMaterial({ color: 0xffd700 });
-  const crown = new THREE.Mesh(crownGeo, crownMat);
-  crown.position.y = 11;
-  group.add(crown);
-  
-  group.position.set(...position);
-  scene.add(group);
-  
-  return group;
-}
+// Note: Castle creation moved to SceneElements/Castle.jsx for better organization
 
 // Create all tiles for a scene
 export function createTileBoard(scene, pathTiles, options = {}) {
@@ -245,31 +229,35 @@ export function createTileBoard(scene, pathTiles, options = {}) {
     includeCastle = mode === 'preview'
   } = options;
 
+  console.log('Tiles: Creating board for', pathTiles.length, 'path tiles in', mode, 'mode');
+
   const { path3D } = convertPathTo3D(pathTiles, { 
     mode, 
     includeSpecialTiles,
     ...options 
   });
   
+  console.log('Tiles: Converted to', path3D.length, '3D tiles');
+  if (path3D.length > 0) {
+    console.log('Tiles: First tile at position:', path3D[0].position);
+    console.log('Tiles: Last tile at position:', path3D[path3D.length - 1].position);
+  }
+  
   const tileMeshes = [];
 
   path3D.forEach((tileData, index) => {
-    // Skip creating mesh for final tile if we're adding a castle
-    if (includeCastle && index === path3D.length - 1) {
-      createCastle(scene, tileData.position);
-      return;
-    }
-
     const tileMesh = createTileMesh(tileData, {
-      radius: tileData.isEnd && !includeCastle ? 1.5 : 1,
+      radius: tileData.isEnd ? 1.5 : 1,
       includeEffects,
       ...options
     });
 
+    console.log('Tiles: Adding tile', index, 'at position:', tileData.position);
     scene.add(tileMesh);
     tileMeshes.push({ mesh: tileMesh, data: tileData });
   });
 
+  console.log('Tiles: Added', tileMeshes.length, 'tile meshes to scene');
   return { tileMeshes, path3D };
 }
 

@@ -54,47 +54,164 @@ const DrawingCanvas = ({ onPathUpdate, onPathComplete }) => {
   };
   
   const processPath = (pathPoints) => {
-    if (pathPoints.length < 2) return [];
+  if (pathPoints.length < 2) return [];
+  
+  console.log('processPath: Input pathPoints:', pathPoints.length);
+  console.log('processPath: First point:', pathPoints[0]);
+  console.log('processPath: Last point:', pathPoints[pathPoints.length - 1]);
+  
+  // Filter out invalid points
+  const validPoints = pathPoints.filter((point, index) => {
+    const isValid = point && 
+      typeof point.x === 'number' && 
+      typeof point.y === 'number' && 
+      !isNaN(point.x) && 
+      !isNaN(point.y) &&
+      isFinite(point.x) &&
+      isFinite(point.y);
     
-    const tiles = [];
-    const tileSpacing = 12;
-    let totalDistance = 0;
-    
-    for (let i = 1; i < pathPoints.length; i++) {
-      const dx = pathPoints[i].x - pathPoints[i-1].x;
-      const dy = pathPoints[i].y - pathPoints[i-1].y;
-      totalDistance += Math.sqrt(dx * dx + dy * dy);
+    if (!isValid) {
+      console.warn('processPath: Filtering out invalid point at index', index, ':', point);
     }
     
-    let currentDistance = 0;
-    let pathIndex = 1;
-    let segmentDistance = 0;
+    return isValid;
+  });
+  
+  if (validPoints.length < 2) {
+    console.error('processPath: Not enough valid points after filtering');
+    return [];
+  }
+  
+  console.log('processPath: Using', validPoints.length, 'valid points');
+  
+  const tiles = [];
+  const tileSpacing = 12;
+  let totalDistance = 0;
+  
+  // Calculate total path distance
+  for (let i = 1; i < validPoints.length; i++) {
+    const dx = validPoints[i].x - validPoints[i-1].x;
+    const dy = validPoints[i].y - validPoints[i-1].y;
+    const segmentDistance = Math.sqrt(dx * dx + dy * dy);
     
-    while (currentDistance < totalDistance && pathIndex < pathPoints.length) {
-      while (pathIndex < pathPoints.length) {
-        const dx = pathPoints[pathIndex].x - pathPoints[pathIndex-1].x;
-        const dy = pathPoints[pathIndex].y - pathPoints[pathIndex-1].y;
-        const segmentLength = Math.sqrt(dx * dx + dy * dy);
+    if (isNaN(segmentDistance) || !isFinite(segmentDistance)) {
+      console.warn('processPath: Invalid segment distance between points', i-1, 'and', i);
+      continue;
+    }
+    
+    totalDistance += segmentDistance;
+  }
+  
+  if (totalDistance === 0) {
+    console.error('processPath: Total distance is 0');
+    return [];
+  }
+  
+  console.log('processPath: Total path distance:', totalDistance);
+  
+  let currentDistance = 0;
+  let pathIndex = 1;
+  let segmentDistance = 0;
+  
+  // Always add the first point as the first tile
+  tiles.push({ 
+    x: validPoints[0].x, 
+    y: validPoints[0].y, 
+    index: 0 
+  });
+  
+  currentDistance = tileSpacing; // Start from tileSpacing for the second tile
+  
+  while (currentDistance < totalDistance && pathIndex < validPoints.length) {
+    while (pathIndex < validPoints.length) {
+      const dx = validPoints[pathIndex].x - validPoints[pathIndex-1].x;
+      const dy = validPoints[pathIndex].y - validPoints[pathIndex-1].y;
+      const segmentLength = Math.sqrt(dx * dx + dy * dy);
+      
+      if (segmentDistance + segmentLength >= currentDistance) {
+        const t = (currentDistance - segmentDistance) / segmentLength;
+        const x = validPoints[pathIndex-1].x + t * dx;
+        const y = validPoints[pathIndex-1].y + t * dy;
         
-        if (segmentDistance + segmentLength >= currentDistance) {
-          const t = (currentDistance - segmentDistance) / segmentLength;
-          const x = pathPoints[pathIndex-1].x + t * dx;
-          const y = pathPoints[pathIndex-1].y + t * dy;
-          
+        // Verify the calculated coordinates are valid
+        if (!isNaN(x) && !isNaN(y) && isFinite(x) && isFinite(y)) {
           tiles.push({ x, y, index: tiles.length });
-          currentDistance += tileSpacing;
-          break;
+        } else {
+          console.warn('processPath: Calculated invalid tile coordinates:', x, y);
         }
         
-        segmentDistance += segmentLength;
-        pathIndex++;
+        currentDistance += tileSpacing;
+        break;
       }
       
-      if (pathIndex >= pathPoints.length) break;
+      segmentDistance += segmentLength;
+      pathIndex++;
     }
     
-    return tiles;
-  };
+    if (pathIndex >= validPoints.length) break;
+  }
+  
+  // Always ensure the last point is included as the final tile
+  const lastPoint = validPoints[validPoints.length - 1];
+  if (tiles.length === 0 || 
+      tiles[tiles.length - 1].x !== lastPoint.x || 
+      tiles[tiles.length - 1].y !== lastPoint.y) {
+    tiles.push({ 
+      x: lastPoint.x, 
+      y: lastPoint.y, 
+      index: tiles.length 
+    });
+  }
+  
+  console.log('processPath: Generated', tiles.length, 'tiles');
+  console.log('processPath: First tile:', tiles[0]);
+  console.log('processPath: Last tile:', tiles[tiles.length - 1]);
+  
+  return tiles;
+};
+
+  // const processPath = (pathPoints) => {
+  //   if (pathPoints.length < 2) return [];
+    
+  //   const tiles = [];
+  //   const tileSpacing = 12;
+  //   let totalDistance = 0;
+    
+  //   for (let i = 1; i < pathPoints.length; i++) {
+  //     const dx = pathPoints[i].x - pathPoints[i-1].x;
+  //     const dy = pathPoints[i].y - pathPoints[i-1].y;
+  //     totalDistance += Math.sqrt(dx * dx + dy * dy);
+  //   }
+    
+  //   let currentDistance = 0;
+  //   let pathIndex = 1;
+  //   let segmentDistance = 0;
+    
+  //   while (currentDistance < totalDistance && pathIndex < pathPoints.length) {
+  //     while (pathIndex < pathPoints.length) {
+  //       const dx = pathPoints[pathIndex].x - pathPoints[pathIndex-1].x;
+  //       const dy = pathPoints[pathIndex].y - pathPoints[pathIndex-1].y;
+  //       const segmentLength = Math.sqrt(dx * dx + dy * dy);
+        
+  //       if (segmentDistance + segmentLength >= currentDistance) {
+  //         const t = (currentDistance - segmentDistance) / segmentLength;
+  //         const x = pathPoints[pathIndex-1].x + t * dx;
+  //         const y = pathPoints[pathIndex-1].y + t * dy;
+          
+  //         tiles.push({ x, y, index: tiles.length });
+  //         currentDistance += tileSpacing;
+  //         break;
+  //       }
+        
+  //       segmentDistance += segmentLength;
+  //       pathIndex++;
+  //     }
+      
+  //     if (pathIndex >= pathPoints.length) break;
+  //   }
+    
+  //   return tiles;
+  // };
   
   const startDrawing = (e) => {
     if (isComplete) return;

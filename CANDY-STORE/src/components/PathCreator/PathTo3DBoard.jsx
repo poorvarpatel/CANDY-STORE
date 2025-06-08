@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { createTileBoard, cleanupTiles } from '../SceneElements/Tiles';
+import { addCastleToPath } from '../SceneElements/Castle';
 
 const PathTo3DBoard = ({ pathTiles, onClose, onStartGame }) => {
   const mountRef = useRef(null);
@@ -71,12 +72,14 @@ const PathTo3DBoard = ({ pathTiles, onClose, onStartGame }) => {
     const { tileMeshes, path3D } = createTileBoard(scene, pathTiles, {
       mode: 'preview',
       includeSpecialTiles: true,
-      includeCastle: true,
       includeEffects: true
     });
     
+    // Add castle manually using dedicated Castle component
+    const castle = addCastleToPath(scene, path3D);
+    
     tilesRef.current = tileMeshes;
-    console.log('Created 3D path with', path3D.length, 'tiles');
+    console.log('PathTo3DBoard: Created 3D path with', path3D.length, 'tiles and castle');
 
     // Position camera to view the entire path
     if (path3D.length > 0) {
@@ -162,8 +165,23 @@ const PathTo3DBoard = ({ pathTiles, onClose, onStartGame }) => {
       console.log('Cleaning up 3D board...');
       isInitializedRef.current = false;
       
-      // Use centralized cleanup
+      // Use centralized cleanup for tiles
       cleanupTiles(scene, tileMeshes);
+      
+      // Clean up castle
+      if (castle) {
+        scene.remove(castle);
+        castle.traverse((child) => {
+          if (child.geometry) child.geometry.dispose();
+          if (child.material) {
+            if (Array.isArray(child.material)) {
+              child.material.forEach(mat => mat.dispose());
+            } else {
+              child.material.dispose();
+            }
+          }
+        });
+      }
       
       document.body.style.overflow = originalOverflow;
       window.removeEventListener('resize', handleResize);
