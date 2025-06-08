@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# secret api keys
+.env
+backend/.env
+**/.env

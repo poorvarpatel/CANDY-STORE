@@ -37,31 +37,63 @@ const ClassDashboard = ({
   const processLessonContent = async () => {
     setIsProcessing(true);
     try {
-      // Simulate AI processing - replace with actual AI integration
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Combine uploaded files and text content
+      let contentToProcess = lessonContent;
       
-      const mockSummary = `Key Concepts Identified:
+      if (!contentToProcess.trim() && uploadedFiles.length > 0) {
+        contentToProcess = `Uploaded files: ${uploadedFiles.map(f => f.name).join(', ')}. Please process these files for educational content analysis.`;
+      }
       
-1. DNA Structure and Components
-   - Double helix structure
-   - Nucleotide composition (A, T, G, C)
-   - Base pairing rules
+      if (!contentToProcess.trim()) {
+        throw new Error('No content to process');
+      }
 
-2. DNA Replication Process
-   - Semi-conservative replication
-   - Role of DNA polymerase
-   - Leading and lagging strands
+      // Call backend API (will build this next)
+      const response = await fetch('http://localhost:3001/api/process-lesson', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: contentToProcess,
+          type: 'class', // Indicates this is for a class, not individual student
+          className: selectedClass?.name
+        })
+      });
 
-3. Genetic Code Translation
-   - Transcription process
-   - mRNA formation
-   - Protein synthesis
+      if (!response.ok) {
+        throw new Error(`Backend API error: ${response.status}`);
+      }
 
-Generated 15 potential quiz questions covering these concepts.`;
+      const result = await response.json();
       
-      setConceptSummary(mockSummary);
+      if (result.success && result.content) {
+        setConceptSummary(result.content);
+      } else {
+        throw new Error(result.error || 'Failed to process content');
+      }
+      
     } catch (error) {
       console.error('Error processing lesson:', error);
+      
+      // For now, show a helpful message about the backend
+      if (error.message.includes('fetch')) {
+        setConceptSummary(`⚠️ Backend not running yet!
+
+We'll build the backend next. For now, here's what the AI will generate:
+
+📚 Key Concepts Identified:
+1. Main topics from your lesson content
+2. Learning objectives
+3. Key facts and relationships
+4. 10-15 potential quiz questions
+
+✅ Next step: Create the backend API to process this content with real AI.
+
+Your content was: "${contentToProcess.substring(0, 100)}..."`);
+      } else {
+        setConceptSummary(`❌ Error: ${error.message}`);
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -84,9 +116,8 @@ Generated 15 potential quiz questions covering these concepts.`;
   };
 
   const handleCreateRooms = (roomConfig) => {
-    console.log('Creating game rooms with config:', roomConfig);
-    // Here you would handle the actual room creation logic
-    // For now, just go back to dashboard
+    console.log('🎮 Creating game rooms with config:', roomConfig);
+    // Here we'll add backend call to actually create rooms
     setShowGameCreator(false);
   };
 

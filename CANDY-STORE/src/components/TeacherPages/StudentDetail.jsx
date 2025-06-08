@@ -49,29 +49,67 @@ const StudentDetail = ({
   const processLessonContent = async () => {
     setIsProcessing(true);
     try {
-      // Simulate AI processing - replace with actual AI integration
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Combine uploaded files and text content
+      let contentToProcess = lessonContent;
       
-      const mockSummary = `Personalized Content for ${selectedStudent?.name}:
+      if (!contentToProcess.trim() && uploadedFiles.length > 0) {
+        contentToProcess = `Uploaded files: ${uploadedFiles.map(f => f.name).join(', ')}. Please process these files for personalized educational content.`;
+      }
       
-Key Concepts Identified:
-1. DNA Structure and Components
-   - Double helix structure
-   - Nucleotide composition (A, T, G, C)
-   - Base pairing rules
+      if (!contentToProcess.trim()) {
+        throw new Error('No content to process');
+      }
 
-2. DNA Replication Process
-   - Semi-conservative replication
-   - Role of DNA polymerase
-   - Leading and lagging strands
+      // Call backend API for personalized content (will build this next)
+      const response = await fetch('http://localhost:3001/api/process-lesson', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: contentToProcess,
+          type: 'student', // Indicates this is for individual student
+          studentName: selectedStudent?.name,
+          studentFocus: studentFocus,
+          className: selectedClass?.name
+        })
+      });
 
-Student Focus Areas: ${studentFocus || 'General biology concepts'}
+      if (!response.ok) {
+        throw new Error(`Backend API error: ${response.status}`);
+      }
 
-Generated 12 personalized quiz questions tailored to this student's learning needs.`;
+      const result = await response.json();
       
-      setConceptSummary(mockSummary);
+      if (result.success && result.content) {
+        setConceptSummary(result.content);
+      } else {
+        throw new Error(result.error || 'Failed to process content');
+      }
+      
     } catch (error) {
       console.error('Error processing lesson:', error);
+      
+      // For now, show a helpful message about the backend
+      if (error.message.includes('fetch')) {
+        setConceptSummary(`⚠️ Backend not running yet!
+
+We'll build the backend next. For now, here's what the AI will generate for ${selectedStudent?.name}:
+
+👤 Personalized Content:
+1. Key concepts relevant to student's focus areas
+2. Customized learning objectives  
+3. Targeted topics for this student
+4. 8-12 personalized quiz questions
+
+🎯 Student Focus: ${studentFocus || 'General learning goals'}
+
+✅ Next step: Create the backend API to process this content with real AI.
+
+Your content was: "${contentToProcess.substring(0, 100)}..."`);
+      } else {
+        setConceptSummary(`❌ Error: ${error.message}`);
+      }
     } finally {
       setIsProcessing(false);
     }
