@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Settings, Users, Plus, Upload, FileText, Loader2 } from 'lucide-react';
+import GameRoomCreator from './GameRoomCreator';
 
 const ClassDashboard = ({ 
   selectedClass, 
@@ -20,6 +21,7 @@ const ClassDashboard = ({
 }) => {
   const [expandedNotes, setExpandedNotes] = useState({});
   const [uploadedFiles, setUploadedFiles] = useState(generalLessonFiles || []);
+  const [showGameCreator, setShowGameCreator] = useState(false);
 
   // Auto-sync uploaded files to parent
   useEffect(() => {
@@ -52,6 +54,24 @@ const ClassDashboard = ({
     await onProcessContent();
   };
 
+  const handleCreateRooms = (roomConfig) => {
+    console.log('🎮 Creating game rooms with config:', roomConfig);
+    // Here we'll add backend call to actually create rooms
+    setShowGameCreator(false);
+  };
+
+  // If showing game creator, render that instead
+  if (showGameCreator) {
+    return (
+      <GameRoomCreator
+        students={students}
+        conceptSummary={generalLessonContent}
+        onCreateRooms={handleCreateRooms}
+        onBack={() => setShowGameCreator(false)}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -68,7 +88,10 @@ const ClassDashboard = ({
               <h1 className="text-2xl font-bold text-gray-800">{selectedClass?.name}</h1>
             </div>
             <div className="flex space-x-3">
-              <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2">
+              <button 
+                onClick={() => setShowGameCreator(true)}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
+              >
                 <Play className="w-4 h-4" />
                 <span>Create Game Rooms</span>
               </button>
