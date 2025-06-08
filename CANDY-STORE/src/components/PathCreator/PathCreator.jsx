@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import PathProgressTracker from './PathProgressTracker';
 import DrawingCanvas from './DrawingCanvas';
 import PathTo3DBoard from './PathTo3DBoard';
+import GameBoard from '../GameBoard/Gameboard';
 
+// Main PathCreator component
 const PathCreator = ({ onClose, onGameStart }) => {
   const [currentLength, setCurrentLength] = useState(0);
   const [pathTiles, setPathTiles] = useState([]);
   const [isPathComplete, setIsPathComplete] = useState(false);
-  const [show3DBoard, setShow3DBoard] = useState(false);
+  const [currentView, setCurrentView] = useState('drawing'); // 'drawing', '3d-preview', 'game'
   
   const handlePathUpdate = (length, tiles) => {
     setCurrentLength(length);
@@ -24,33 +26,48 @@ const PathCreator = ({ onClose, onGameStart }) => {
     setCurrentLength(0);
     setPathTiles([]);
     setIsPathComplete(false);
-    setShow3DBoard(false);
+    setCurrentView('drawing');
   };
 
   const handleShow3D = () => {
-    setShow3DBoard(true);
-  };
-
-  const handleClose3D = () => {
-    setShow3DBoard(false);
+    setCurrentView('3d-preview');
   };
 
   const handleStartGame = () => {
-    // Pass the path data back to the parent dashboard
-    onGameStart(pathTiles);
+    console.log('PathCreator: Starting game with', pathTiles.length, 'tiles');
+    setCurrentView('game');
   };
 
-  // Show 3D board if requested
-  if (show3DBoard && pathTiles.length > 0) {
+  const handleBackToDrawing = () => {
+    setCurrentView('drawing');
+  };
+
+  const handleBackToPreview = () => {
+    setCurrentView('3d-preview');
+  };
+
+  // Render current view
+  if (currentView === 'game') {
+    return (
+      <GameBoard 
+        pathTiles={pathTiles} 
+        onClose={handleBackToPreview}
+        studentName="Player"
+      />
+    );
+  }
+
+  if (currentView === '3d-preview' && pathTiles.length > 0) {
     return (
       <PathTo3DBoard 
         pathTiles={pathTiles} 
-        onClose={onClose}
+        onClose={handleBackToDrawing}
         onStartGame={handleStartGame}
       />
     );
   }
   
+  // Default: drawing view
   return (
     <div className="fixed inset-0 bg-white z-40 overflow-auto">
       <div className="max-w-4xl mx-auto p-6 space-y-6">
@@ -96,7 +113,7 @@ const PathCreator = ({ onClose, onGameStart }) => {
             <li>Draw any path you want with your mouse or finger</li>
             <li>The system converts your drawing into evenly-spaced game tiles</li>
             <li>Progress bar shows if your path is the right length (40-100 tiles)</li>
-            <li>Once complete, we'll build a 3D board following your exact path!</li>
+            <li>Preview your 3D board, then start the 5-color educational game!</li>
           </ul>
         </div>
       </div>

@@ -1,306 +1,126 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { OrbitControls, Html } from '@react-three/drei';
 import * as THREE from 'three';
 
-const GameBoard = ({ onClose, gameData, studentName }) => {
-  // Three.js refs
-  const mountRef = useRef(null);
-  const sceneRef = useRef(null);
-  const rendererRef = useRef(null);
-  const cameraRef = useRef(null);
-  const isInitializedRef = useRef(false);
-  
-  // Orbit controls state
-  const orbitStateRef = useRef({
-    isRotating: false,
-    previousMousePosition: { x: 0, y: 0 },
-    spherical: new THREE.Spherical(20, Math.PI / 3, 0), // radius, phi, theta
-    target: new THREE.Vector3(0, 0, 0),
-    autoFollow: true
+const COLORS = {
+  red: { hex: 0xff4444, name: 'Red' },
+  blue: { hex: 0x4444ff, name: 'Blue' },
+  green: { hex: 0x44ff44, name: 'Green' },
+  yellow: { hex: 0xffff44, name: 'Yellow' },
+  purple: { hex: 0xff44ff, name: 'Purple' }
+};
+
+const COLOR_KEYS = Object.keys(COLORS);
+
+function generateColorSequence(pathLength) {
+  if (pathLength < 7) return Array.from({ length: pathLength }, (_, i) => COLOR_KEYS[i % 5]);
+
+  const sequence = [...COLOR_KEYS, COLOR_KEYS[0], COLOR_KEYS[1]];
+
+  for (let i = 7; i < pathLength; i++) {
+    const lastSix = sequence.slice(i - 6, i);
+    const colorCount = {};
+    COLOR_KEYS.forEach(color => colorCount[color] = 0);
+    lastSix.forEach(color => colorCount[color]++);
+    const minCount = Math.min(...Object.values(colorCount));
+    const candidateColors = COLOR_KEYS.filter(color => colorCount[color] === minCount);
+    const nextColor = candidateColors[Math.floor(Math.random() * candidateColors.length)];
+    sequence.push(nextColor);
+  }
+  return sequence;
+}
+
+function validateColorSequence(sequence) {
+  if (sequence.length < 7) return true;
+  for (let i = 0; i <= sequence.length - 7; i++) {
+    const window = sequence.slice(i, i + 7);
+    const uniqueColors = new Set(window);
+    if (uniqueColors.size < 5) return false;
+  }
+  return true;
+}
+
+function convertPathTo3D(path2D) {
+  if (!path2D || path2D.length === 0) return [];
+  const colorSequence = generateColorSequence(path2D.length);
+  const isValid = validateColorSequence(colorSequence);
+
+  const xs = path2D.map(p => p.x ?? p[0]);
+  const ys = path2D.map(p => p.y ?? p[1]);
+
+  const xMin = Math.min(...xs);
+  const xMax = Math.max(...xs);
+  const yMin = Math.min(...ys);
+  const yMax = Math.max(...ys);
+
+  const xRange = xMax - xMin || 1;
+  const yRange = yMax - yMin || 1;
+
+  const scale = 0.9; // increased spacing between tiles
+
+  const path3D = [];
+
+  path2D.forEach((point2D, index) => {
+    const x = ((point2D.x ?? point2D[0]) - xMin - xRange / 2) * scale;
+    const z = ((point2D.y ?? point2D[1]) - yMin - yRange / 2) * scale;
+    let y = 0;
+    const progress = index / path2D.length;
+    y += progress * 8;
+    y += Math.sin(progress * 4 * Math.PI) * 1.5;
+    y += (Math.random() - 0.5) * 0.5;
+
+    const colorKey = colorSequence[index];
+    const colorData = COLORS[colorKey];
+
+    path3D.push({
+      id: index,
+      position: [x, y, z],
+      colorValue: colorData.hex,
+      colorName: colorData.name
+    });
   });
 
-  // Update camera position based on orbit state
-  const updateCamera = (camera, orbitState) => {
-    camera.position.setFromSpherical(orbitState.spherical);
-    camera.position.add(orbitState.target);
-    camera.lookAt(orbitState.target);
-  };
+  return { path3D, isValid, colorSequence };
+}
 
-  // Initialize Three.js
-  useEffect(() => {
-    if (!mountRef.current || isInitializedRef.current) {
-      return;
-    }
+const Tile = ({ position, colorValue, isStart, isEnd }) => {
+  return (
+    <group position={position}>
+      <mesh castShadow receiveShadow>
+        <cylinderGeometry args={[1, 1, 0.3, 8]} />
+        <meshLambertMaterial color={colorValue} transparent opacity={0.9} />
+      </mesh>
+      {isStart || isEnd ? (
+        <mesh position={[0, 0.16, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[1.1, 1.4, 16]} />
+          <meshBasicMaterial color={isStart ? 0x00ff00 : 0xffd700} transparent opacity={0.6} />
+        </mesh>
+      ) : null}
+    </group>
+  );
+};
 
-    console.log('Initializing GameBoard...');
-    isInitializedRef.current = true;
+const TileBoard = ({ pathTiles }) => {
+  const { path3D } = convertPathTo3D(pathTiles);
+  return (
+    <>
+      {path3D.map((tile, i) => (
+        <Tile key={i} position={tile.position} colorValue={tile.colorValue} isStart={i === 0} isEnd={i === path3D.length - 1} />
+      ))}
+    </>
+  );
+};
 
-    // Scene setup
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87ceeb);
-    sceneRef.current = scene;
-
-    // Camera
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    cameraRef.current = camera;
-
-    // Initialize orbit controls
-    const orbitState = orbitStateRef.current;
-    orbitState.spherical.set(20, Math.PI / 3, 0);
-    orbitState.target.set(0, 0, 0);
-    updateCamera(camera, orbitState);
-
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    mountRef.current.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
-
-    // Orbit controls
-    const handleMouseDown = (event) => {
-      orbitState.isRotating = true;
-      orbitState.autoFollow = false;
-      orbitState.previousMousePosition = { x: event.clientX, y: event.clientY };
-    };
-    
-    const handleMouseUp = () => {
-      orbitState.isRotating = false;
-    };
-    
-    const handleMouseMove = (event) => {
-      if (!orbitState.isRotating) return;
-      
-      const deltaMove = {
-        x: event.clientX - orbitState.previousMousePosition.x,
-        y: event.clientY - orbitState.previousMousePosition.y
-      };
-      
-      orbitState.spherical.theta -= deltaMove.x * 0.01;
-      orbitState.spherical.phi += deltaMove.y * 0.01;
-      orbitState.spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, orbitState.spherical.phi));
-      
-      updateCamera(camera, orbitState);
-      orbitState.previousMousePosition = { x: event.clientX, y: event.clientY };
-    };
-
-    // Zoom controls
-    const handleWheel = (event) => {
-      event.preventDefault();
-      orbitState.autoFollow = false;
-      
-      const zoomSpeed = 0.1;
-      const zoomDirection = event.deltaY > 0 ? 1 : -1;
-      
-      orbitState.spherical.radius += zoomDirection * zoomSpeed * orbitState.spherical.radius;
-      orbitState.spherical.radius = Math.max(3, Math.min(80, orbitState.spherical.radius));
-      
-      updateCamera(camera, orbitState);
-    };
-
-    // Touch controls
-    let touches = [];
-    let lastDistance = 0;
-
-    const handleTouchStart = (event) => {
-      touches = Array.from(event.touches);
-      orbitState.autoFollow = false;
-      
-      if (touches.length === 1) {
-        orbitState.isRotating = true;
-        orbitState.previousMousePosition = { x: touches[0].clientX, y: touches[0].clientY };
-      } else if (touches.length === 2) {
-        const dx = touches[0].clientX - touches[1].clientX;
-        const dy = touches[0].clientY - touches[1].clientY;
-        lastDistance = Math.sqrt(dx * dx + dy * dy);
-      }
-    };
-
-    const handleTouchMove = (event) => {
-      event.preventDefault();
-      touches = Array.from(event.touches);
-      
-      if (touches.length === 1 && orbitState.isRotating) {
-        const deltaMove = {
-          x: touches[0].clientX - orbitState.previousMousePosition.x,
-          y: touches[0].clientY - orbitState.previousMousePosition.y
-        };
-        
-        orbitState.spherical.theta -= deltaMove.x * 0.01;
-        orbitState.spherical.phi += deltaMove.y * 0.01;
-        orbitState.spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, orbitState.spherical.phi));
-        
-        updateCamera(camera, orbitState);
-        orbitState.previousMousePosition = { x: touches[0].clientX, y: touches[0].clientY };
-        
-      } else if (touches.length === 2) {
-        const dx = touches[0].clientX - touches[1].clientX;
-        const dy = touches[0].clientY - touches[1].clientY;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        if (lastDistance > 0) {
-          const zoomFactor = distance / lastDistance;
-          orbitState.spherical.radius /= zoomFactor;
-          orbitState.spherical.radius = Math.max(3, Math.min(80, orbitState.spherical.radius));
-          updateCamera(camera, orbitState);
-        }
-        
-        lastDistance = distance;
-      }
-    };
-
-    const handleTouchEnd = () => {
-      orbitState.isRotating = false;
-      touches = [];
-      lastDistance = 0;
-    };
-    
-    // Add event listeners
-    renderer.domElement.addEventListener('mousedown', handleMouseDown);
-    renderer.domElement.addEventListener('mouseup', handleMouseUp);
-    renderer.domElement.addEventListener('mousemove', handleMouseMove);
-    renderer.domElement.addEventListener('mouseleave', handleMouseUp);
-    renderer.domElement.addEventListener('wheel', handleWheel, { passive: false });
-    renderer.domElement.addEventListener('touchstart', handleTouchStart, { passive: false });
-    renderer.domElement.addEventListener('touchmove', handleTouchMove, { passive: false });
-    renderer.domElement.addEventListener('touchend', handleTouchEnd);
-
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambientLight);
-
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(10, 20, 5);
-    directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
-    scene.add(directionalLight);
-
-    // Animation loop
-    const animate = () => {
-      requestAnimationFrame(animate);
-      renderer.render(scene, camera);
-    };
-    animate();
-
-    // Handle window resize
-    const handleResize = () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    };
-    window.addEventListener('resize', handleResize);
-
-    // Cleanup
-    return () => {
-      console.log('Cleaning up GameBoard...');
-      isInitializedRef.current = false;
-      
-      window.removeEventListener('resize', handleResize);
-      
-      if (renderer && renderer.domElement) {
-        renderer.domElement.removeEventListener('mousedown', handleMouseDown);
-        renderer.domElement.removeEventListener('mouseup', handleMouseUp);
-        renderer.domElement.removeEventListener('mousemove', handleMouseMove);
-        renderer.domElement.removeEventListener('mouseleave', handleMouseUp);
-        renderer.domElement.removeEventListener('wheel', handleWheel);
-        renderer.domElement.removeEventListener('touchstart', handleTouchStart);
-        renderer.domElement.removeEventListener('touchmove', handleTouchMove);
-        renderer.domElement.removeEventListener('touchend', handleTouchEnd);
-      }
-      
-      if (mountRef.current && renderer.domElement) {
-        mountRef.current.removeChild(renderer.domElement);
-      }
-      
-      renderer.dispose();
-      sceneRef.current = null;
-      rendererRef.current = null;
-      cameraRef.current = null;
-    };
-  }, []);
-
-  // Reset camera to default position
-  const resetCamera = () => {
-    const orbitState = orbitStateRef.current;
-    orbitState.target.set(0, 0, 0);
-    orbitState.spherical.set(20, Math.PI / 3, 0);
-    orbitState.autoFollow = true;
-    
-    if (cameraRef.current) {
-      updateCamera(cameraRef.current, orbitState);
-    }
-  };
-
-  // Toggle auto-follow
-  const toggleAutoFollow = () => {
-    orbitStateRef.current.autoFollow = !orbitStateRef.current.autoFollow;
-  };
-
+const GameBoard = ({ pathTiles }) => {
   return (
     <div className="fixed inset-0 w-full h-screen bg-gray-900 z-50">
-      <div ref={mountRef} className="w-full h-full" />
-      
-      {/* Header */}
-      <div className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/50 to-transparent">
-        <div className="flex justify-between items-center text-white">
-          <h1 className="text-3xl font-bold">
-            🎮 {gameData?.title || 'Educational Game Board'}
-          </h1>
-          <div className="flex items-center space-x-4">
-            <div className="text-right">
-              {studentName && (
-                <p className="text-lg">Playing as: <span className="font-bold">{studentName}</span></p>
-              )}
-              <p className="text-lg">Scene: Empty with Controls</p>
-            </div>
-            {onClose && (
-              <button 
-                onClick={onClose}
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                ✕ Close
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Camera Controls */}
-      <div className="absolute top-20 right-6 bg-black/50 rounded-lg p-3 text-white">
-        <div className="text-sm mb-2">Camera Controls:</div>
-        <div className="text-xs space-y-1">
-          <div>🖱️ Drag to rotate</div>
-          <div>⚙️ Scroll to zoom</div>
-          <div>📱 Pinch to zoom (mobile)</div>
-        </div>
-        <button
-          onClick={toggleAutoFollow}
-          className={`mt-2 px-3 py-1 rounded text-xs ${
-            orbitStateRef.current?.autoFollow 
-              ? 'bg-green-600 hover:bg-green-700' 
-              : 'bg-gray-600 hover:bg-gray-700'
-          }`}
-        >
-          Auto-Follow: {orbitStateRef.current?.autoFollow ? 'ON' : 'OFF'}
-        </button>
-        <button
-          onClick={resetCamera}
-          className="ml-2 mt-2 px-3 py-1 rounded text-xs bg-blue-600 hover:bg-blue-700"
-        >
-          🎯 Reset View
-        </button>
-      </div>
-
-      {/* Simple Status */}
-      <div className="absolute bottom-6 left-6 right-6">
-        <div className="bg-white/90 rounded-lg p-4 text-center">
-          <p className="text-lg text-gray-800">Empty scene with orbit controls ready!</p>
-          <p className="text-sm text-gray-600 mt-2">
-            Try dragging to rotate, scrolling to zoom, or use the camera controls above.
-          </p>
-        </div>
-      </div>
+      <Canvas shadows camera={{ position: [0, 20, 30], fov: 50 }}>
+        <ambientLight intensity={0.5} />
+        <directionalLight position={[10, 20, 5]} intensity={0.8} castShadow />
+        <OrbitControls />
+        <TileBoard pathTiles={pathTiles} />
+      </Canvas>
     </div>
   );
 };
