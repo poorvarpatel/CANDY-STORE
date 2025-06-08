@@ -3,11 +3,13 @@ import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { createTileBoard, cleanupTiles } from '../SceneElements/Tiles';
 import { addCastleToPath, createColoredCastle, createSimpleCastle } from '../SceneElements/Castle';
+import { createPlayerBall } from '../SceneElements/Player';
 
 const GameBoard = ({ pathTiles, includeCastle = true, castleStyle = 'default' }) => {
   const TileBoard = ({ pathTiles, includeCastle, castleStyle }) => {
     const { scene, camera } = useThree();
     const castleRef = useRef(null);
+    const playerRef = useRef(null);
     
     useEffect(() => {
       if (!pathTiles || pathTiles.length === 0) {
@@ -24,8 +26,15 @@ const GameBoard = ({ pathTiles, includeCastle = true, castleStyle = 'default' })
       });
       
       console.log('GameBoard: Created', tileMeshes.length, 'tile meshes');
-      console.log('GameBoard: First tile position:', path3D[0]?.position);
-      console.log('GameBoard: Last tile position:', path3D[path3D.length - 1]?.position);
+      
+      // Add a single player ball at the starting position
+      if (path3D.length > 0) {
+        const startPosition = path3D[0].position;
+        const playerBall = createPlayerBall(startPosition, { color: 0xff4444 }); // Red ball
+        scene.add(playerBall);
+        playerRef.current = playerBall;
+        console.log('GameBoard: Added player ball at start position');
+      }
       
       // Position camera to view the entire path
       if (path3D.length > 0) {
@@ -58,8 +67,6 @@ const GameBoard = ({ pathTiles, includeCastle = true, castleStyle = 'default' })
           }
         } else {
           console.error('GameBoard: Invalid tile positions detected');
-          console.log('GameBoard: Start position:', startPos);
-          console.log('GameBoard: End position:', endPos);
           // Fallback to default camera position
           camera.position.set(0, 20, 30);
           camera.lookAt(0, 0, 0);
@@ -120,6 +127,15 @@ const GameBoard = ({ pathTiles, includeCastle = true, castleStyle = 'default' })
       return () => {
         console.log('GameBoard: Cleaning up');
         
+        // Clean up player ball
+        if (playerRef.current) {
+          scene.remove(playerRef.current);
+          playerRef.current.geometry.dispose();
+          playerRef.current.material.dispose();
+          playerRef.current = null;
+          console.log('GameBoard: Cleaned up player ball');
+        }
+        
         // Clean up tiles
         cleanupTiles(scene, tileMeshes);
         
@@ -176,6 +192,7 @@ const GameBoard = ({ pathTiles, includeCastle = true, castleStyle = 'default' })
       <div className="absolute top-6 right-6 bg-black/50 rounded-lg p-3 text-white z-10">
         <div className="text-lg font-bold">🎮 Educational Adventure</div>
         <div className="text-sm">Path: {pathTiles.length} tiles</div>
+        <div className="text-sm">🔴 Player Ball Added!</div>
         {includeCastle && <div className="text-xs text-green-300">🏰 Castle: {castleStyle}</div>}
       </div>
 
