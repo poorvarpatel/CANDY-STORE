@@ -4,6 +4,7 @@ import { OrbitControls } from '@react-three/drei';
 import { createTileBoard, cleanupTiles } from '../SceneElements/Tiles';
 import { addCastleToPath, createColoredCastle, createSimpleCastle } from '../SceneElements/Castle';
 import { createPlayerBall } from '../SceneElements/Player';
+import GameQuestionBox from './GameQuestionBox';
 
 const GameBoard = ({ 
   pathTiles, 
@@ -36,7 +37,8 @@ const GameBoard = ({
       // Create the tile board (all tiles including final one)
       const { tileMeshes, path3D } = createTileBoard(scene, pathTiles, {
         mode: 'game',
-        includeEffects: true
+        includeEffects: true,
+        heightOffset: 15 // Push all tiles 5 units higher
       });
       
       console.log('GameBoard: Created', tileMeshes.length, 'tile meshes');
@@ -44,16 +46,18 @@ const GameBoard = ({
       // Add a single player ball at the starting position (always just 1 for solo)
       if (path3D.length > 0) {
         const startPosition = path3D[0].position;
-        const playerBall = createPlayerBall(startPosition, { color: 0xff4444 }); // Red ball
+        // Add slight height boost for player ball visibility
+        const playerPosition = [startPosition[0], startPosition[1] + 0.5, startPosition[2]];
+        const playerBall = createPlayerBall(playerPosition, { color: 0xff4444 }); // Red ball
         scene.add(playerBall);
         playerRef.current = playerBall;
         
-        console.log('GameBoard: Added SOLO player ball at start position:', startPosition);
+        console.log('GameBoard: Added SOLO player ball at elevated position:', playerPosition);
         
         // NOW position camera using the ACTUAL player position
-        const playerX = startPosition[0];
-        const playerY = startPosition[1];
-        const playerZ = startPosition[2];
+        const playerX = playerPosition[0];
+        const playerY = playerPosition[1];
+        const playerZ = playerPosition[2];
         
         // Find the next tile to point the camera toward
         const currentTileIndex = 0; // Player starts at tile 0
@@ -69,22 +73,22 @@ const GameBoard = ({
         const normalizedX = directionLength > 0 ? directionX / directionLength : 0;
         const normalizedZ = directionLength > 0 ? directionZ / directionLength : 1;
         
-        // Position camera BEHIND the player, opposite to the direction of the next tile
+        // Position camera BEHIND and ABOVE the player for a good view of elevated content
         const cameraDistance = 8;
         camera.position.set(
           playerX - (normalizedX * cameraDistance), // Opposite direction X
-          playerY + 2,                              // Just above ground level
+          playerY + 2,                              // Above the elevated player
           playerZ - (normalizedZ * cameraDistance)  // Opposite direction Z
         );
         
-        // Look toward the NEXT TILE (player should be visible in between)
+        // Look toward the NEXT TILE at elevated position
         camera.lookAt(
           nextTile.position[0],     // Next tile X
           nextTile.position[1] + 1, // Next tile Y (slightly above)
           nextTile.position[2]      // Next tile Z
         );
         
-        // Update OrbitControls target to the next tile
+        // Update OrbitControls target to the elevated next tile
         if (orbitControlsRef.current) {
           orbitControlsRef.current.target.set(
             nextTile.position[0], 
@@ -232,12 +236,27 @@ const GameBoard = ({
       {/* Game Header */}
       <div className="absolute top-6 right-6 bg-black/50 rounded-lg p-3 text-white z-10">
         <div className="text-lg font-bold">🎮 Educational Adventure</div>
-        <div className="text-sm">Path: {pathTiles.length} tiles</div>
+        <div className="text-sm">🎯 Answer questions to reach the castle!</div>
         <div className="text-sm">🔴 Third-Person Camera View</div>
         {includeCastle && <div className="text-xs text-green-300">🏰 Castle: {castleStyle}</div>}
       </div>
 
-      <Canvas shadows camera={{ position: [0, 20, 30], fov: 50 }}>
+      {/* Game Question Box */}
+      <GameQuestionBox 
+        currentQuestion={null}
+        onAnswerSelect={(answerIndex, colorKey) => {
+          console.log('Answer selected:', answerIndex, colorKey);
+          // TODO: Implement game logic
+        }}
+        gameStats={{
+          currentQuestion: 1,
+          totalQuestions: pathTiles.length || 10, // Keep for internal logic but don't display
+          score: 0,
+          totalAttempts: 0
+        }}
+      />
+
+      <Canvas shadows camera={{ position: [0, 15, 25], fov: 60 }}>
         <ambientLight intensity={0.5} />
         <directionalLight position={[10, 20, 5]} intensity={0.8} castShadow />
         <TileBoard 

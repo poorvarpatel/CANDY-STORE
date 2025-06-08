@@ -64,6 +64,7 @@ export function convertPathTo3D(path2D, options = {}) {
     mode = 'game', // 'game' or 'preview'
     includeSpecialTiles = false,
     heightVariation = true,
+    heightOffset = 15, // Base height offset to push tiles higher/lower
     scale = 0.9
   } = options;
 
@@ -75,6 +76,7 @@ export function convertPathTo3D(path2D, options = {}) {
   const validPath2D = path2D.filter((point, index) => {
     const x = point.x ?? point[0];
     const y = point.y ?? point[1];
+    
     const isValid = !isNaN(x) && !isNaN(y) && isFinite(x) && isFinite(y);
     
     if (!isValid) {
@@ -114,7 +116,7 @@ export function convertPathTo3D(path2D, options = {}) {
     const z = ((point2D.y ?? point2D[1]) - yMin - yRange / 2) * scale;
     
     // Calculate height
-    let y = 0;
+    let y = heightOffset; // Start with base offset
     if (heightVariation) {
       const progress = index / validPath2D.length;
       y += progress * 8; // Rise toward the end
@@ -234,7 +236,7 @@ export function createTileBoard(scene, pathTiles, options = {}) {
   const { path3D } = convertPathTo3D(pathTiles, { 
     mode, 
     includeSpecialTiles,
-    ...options 
+    ...options  // This will pass through heightOffset and other options
   });
   
   console.log('Tiles: Converted to', path3D.length, '3D tiles');
