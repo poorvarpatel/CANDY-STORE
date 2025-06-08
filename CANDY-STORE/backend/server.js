@@ -1,4 +1,5 @@
 // backend/server.js - Fresh OpenAI Version
+// NO CHANGES NEEDED - PDF export is handled client-side
 const express = require('express');
 const cors = require('cors');
 const OpenAI = require('openai');
@@ -75,10 +76,12 @@ Lesson Content:
 ${content}
 
 Please provide:
-1. Key concepts relevant to this student's focus areas
-2. Personalized learning objectives
-3. Specific topics this student should focus on  
-4. 8-10 targeted quiz questions appropriate for individual study
+1. Brief summary of key concepts
+2. Key concepts relevant to this student's focus areas
+3. Personalized learning objectives
+4. Specific topics this student should focus on
+5. 20 targeted quiz questions (~90-95% multiple choice, ~5-10% fill in the blank) appropriate for individual study. Clear link to which key concept, personalized learning objective, or topic of focus listed above is being assessed.
+6. Answers provided for each question.
 
 Format your response as a clear, structured analysis that helps this student learn effectively.`;
   } else {
@@ -110,7 +113,7 @@ Format your response as a clear educational summary that a teacher can review an
           content: prompt
         }
       ],
-      max_tokens: 800,
+      max_tokens: 2000, // Increased from 800 to allow for 25 questions
       temperature: 0.7
     });
 
@@ -191,7 +194,7 @@ ${content.substring(0, 300)}...
 1. Structured summary of key concepts
 2. Main topics and subtopics  
 3. Learning objectives and assessments
-4. 12 engaging quiz questions
+4. 25 engaging quiz questions
 
 🔧 Fix: Check your OPENAI_API_KEY in backend/.env
 
@@ -229,7 +232,7 @@ Student Goals: ${studentGoals || 'General understanding'}
 
 For each question, provide:
 1. Clear question text
-2. 4 answer choices (A, B, C, D)  
+2. 5 answer choices (A, B, C, D, E)  
 3. Correct answer
 4. Brief explanation
 
@@ -247,7 +250,7 @@ Format as a numbered list of questions.`;
           content: prompt
         }
       ],
-      max_tokens: 1000,
+      max_tokens: 1500, // Increased to ensure full quiz generation
       temperature: 0.8
     });
     
