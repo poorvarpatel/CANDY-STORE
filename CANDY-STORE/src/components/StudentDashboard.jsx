@@ -149,7 +149,7 @@ const StudentDashboard = ({ studentName = "Emma Davis" }) => {
                 onClick={() => handleStartPractice({ title: 'Solo Practice Mode', difficulty: 'Custom' })}
                 className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
               >
-                <span>🎨 Create Custom Board</span>
+                <span>🎨 Solo Practice</span>
               </button>
             </div>
           </div>
