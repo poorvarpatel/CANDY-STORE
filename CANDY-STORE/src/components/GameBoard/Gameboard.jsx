@@ -10,6 +10,7 @@ const GameBoard = ({ pathTiles, includeCastle = true, castleStyle = 'default' })
     const { scene, camera } = useThree();
     const castleRef = useRef(null);
     const playerRef = useRef(null);
+    const orbitControlsRef = useRef();
     
     useEffect(() => {
       if (!pathTiles || pathTiles.length === 0) {
@@ -33,48 +34,56 @@ const GameBoard = ({ pathTiles, includeCastle = true, castleStyle = 'default' })
         const playerBall = createPlayerBall(startPosition, { color: 0xff4444 }); // Red ball
         scene.add(playerBall);
         playerRef.current = playerBall;
-        console.log('GameBoard: Added player ball at start position');
-      }
-      
-      // Position camera to view the entire path
-      if (path3D.length > 0) {
-        const startPos = path3D[0].position;
-        const endPos = path3D[path3D.length - 1].position;
         
-        // Check for valid coordinates
-        const isValidPos = (pos) => pos && pos.length === 3 && 
-          pos.every(coord => !isNaN(coord) && isFinite(coord));
+        console.log('GameBoard: Added player ball at start position:', startPosition);
         
-        if (isValidPos(startPos) && isValidPos(endPos)) {
-          const centerX = (startPos[0] + endPos[0]) / 2;
-          const centerY = (startPos[1] + endPos[1]) / 2 + 5;
-          const centerZ = (startPos[2] + endPos[2]) / 2;
-          
-          // Verify camera target coordinates are valid
-          if (!isNaN(centerX) && !isNaN(centerY) && !isNaN(centerZ)) {
-            // Position camera to see the entire path
-            const distance = Math.max(30, path3D.length * 0.3);
-            camera.position.set(centerX, centerY + distance * 0.7, centerZ + distance);
-            camera.lookAt(centerX, centerY, centerZ);
-            
-            console.log('GameBoard: Camera positioned at:', camera.position);
-            console.log('GameBoard: Camera looking at:', centerX, centerY, centerZ);
-          } else {
-            console.error('GameBoard: Invalid camera target coordinates');
-            // Fallback to default camera position
-            camera.position.set(0, 20, 30);
-            camera.lookAt(0, 0, 0);
-          }
-        } else {
-          console.error('GameBoard: Invalid tile positions detected');
-          // Fallback to default camera position
-          camera.position.set(0, 20, 30);
-          camera.lookAt(0, 0, 0);
+        // NOW position camera using the ACTUAL player position
+        const playerX = startPosition[0];
+        const playerY = startPosition[1];
+        const playerZ = startPosition[2];
+        
+        // Find the next tile to point the camera toward
+        const currentTileIndex = 0; // Player starts at tile 0
+        const nextTileIndex = Math.min(currentTileIndex + 1, path3D.length - 1);
+        const nextTile = path3D[nextTileIndex];
+        
+        // Calculate direction from player to next tile
+        const directionX = nextTile.position[0] - playerX;
+        const directionZ = nextTile.position[2] - playerZ;
+        
+        // Normalize the direction
+        const directionLength = Math.sqrt(directionX * directionX + directionZ * directionZ);
+        const normalizedX = directionLength > 0 ? directionX / directionLength : 0;
+        const normalizedZ = directionLength > 0 ? directionZ / directionLength : 1;
+        
+        // Position camera BEHIND the player, opposite to the direction of the next tile
+        const cameraDistance = 8;
+        camera.position.set(
+          playerX - (normalizedX * cameraDistance), // Opposite direction X
+          playerY + 2,                              // Just above ground level
+          playerZ - (normalizedZ * cameraDistance)  // Opposite direction Z
+        );
+        
+        // Look toward the NEXT TILE (player should be visible in between)
+        camera.lookAt(
+          nextTile.position[0],     // Next tile X
+          nextTile.position[1] + 1, // Next tile Y (slightly above)
+          nextTile.position[2]      // Next tile Z
+        );
+        
+        // Update OrbitControls target to the next tile
+        if (orbitControlsRef.current) {
+          orbitControlsRef.current.target.set(
+            nextTile.position[0], 
+            nextTile.position[1] + 1, 
+            nextTile.position[2]
+          );
+          orbitControlsRef.current.update();
         }
-      } else {
-        console.warn('GameBoard: No path3D tiles found');
-        camera.position.set(0, 20, 30);
-        camera.lookAt(0, 0, 0);
+        
+        console.log('GameBoard: Direction to next tile:', normalizedX, normalizedZ);
+        console.log('GameBoard: Camera positioned behind player at:', camera.position);
+        console.log('GameBoard: Camera looking toward next tile at:', nextTile.position);
       }
       
       // Add castle if requested
@@ -159,7 +168,15 @@ const GameBoard = ({ pathTiles, includeCastle = true, castleStyle = 'default' })
       };
     }, [scene, camera, pathTiles, includeCastle, castleStyle]);
     
-    return null;
+    return (
+      <>
+        <OrbitControls 
+          ref={orbitControlsRef}
+          enableDamping 
+          dampingFactor={0.05}
+        />
+      </>
+    );
   };
 
   if (!pathTiles || pathTiles.length === 0) {
@@ -188,18 +205,28 @@ const GameBoard = ({ pathTiles, includeCastle = true, castleStyle = 'default' })
         </div>
       )}
 
+      {/* Camera Info */}
+      <div className="absolute bottom-6 left-6 bg-black/50 rounded-lg p-3 text-white z-10">
+        <div className="text-sm font-bold mb-2">📷 Camera Control</div>
+        <div className="text-xs space-y-1">
+          <div>🎯 Behind player, pointing toward NEXT tile</div>
+          <div>👀 Follows the path direction dynamically</div>
+          <div>🖱️ Use mouse to orbit around player</div>
+          <div>⚙️ Scroll to zoom in/out</div>
+        </div>
+      </div>
+
       {/* Game Header */}
       <div className="absolute top-6 right-6 bg-black/50 rounded-lg p-3 text-white z-10">
         <div className="text-lg font-bold">🎮 Educational Adventure</div>
         <div className="text-sm">Path: {pathTiles.length} tiles</div>
-        <div className="text-sm">🔴 Player Ball Added!</div>
+        <div className="text-sm">🔴 Third-Person Camera View</div>
         {includeCastle && <div className="text-xs text-green-300">🏰 Castle: {castleStyle}</div>}
       </div>
 
       <Canvas shadows camera={{ position: [0, 20, 30], fov: 50 }}>
         <ambientLight intensity={0.5} />
         <directionalLight position={[10, 20, 5]} intensity={0.8} castShadow />
-        <OrbitControls />
         <TileBoard 
           pathTiles={pathTiles} 
           includeCastle={includeCastle}
