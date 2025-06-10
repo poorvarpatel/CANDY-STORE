@@ -20,7 +20,7 @@ lessons and teachers struggled to ensure that students continued their education
 afterwards, as students began coming back to school, it became clear that students were
 coming back at highly varying levels of education and social situational awareness.
 
-### **My Solution**
+### **Solution**
 A comprehensive platform that allows teachers to:
 - Transform lesson plans into engaging, personalized games for each student
 - Provide self-paced, individualized learning experiences
