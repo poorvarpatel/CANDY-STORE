@@ -8,8 +8,10 @@ import GameBoard from '../GameBoard/Gameboard';
 const PathCreator = ({ 
   onClose, 
   onGameStart, 
-  gameData = null // NEW: Receive game data from StudentDashboard
+  gameData = null // Receive game data from StudentDashboard
 }) => {
+  console.log('📚 PathCreator: Received gameData.questionsData:', gameData?.questionsData);
+console.log('📚 PathCreator: Received gameData.content:', gameData?.content);
   const [currentLength, setCurrentLength] = useState(0);
   const [pathTiles, setPathTiles] = useState([]);
   const [isPathComplete, setIsPathComplete] = useState(false);
@@ -66,12 +68,19 @@ const PathCreator = ({
 
   // Render current view
   if (currentView === 'game') {
+
+    console.log('🎮 PathCreator: About to render GameBoard');
+  console.log('🎮 PathCreator: gameData.questionsData:', gameData?.questionsData);
+  console.log('🎮 PathCreator: gameData.content:', gameData?.content);
+  console.log('🎮 PathCreator: Passing questionsData:', gameData?.questionsData || gameData?.content);
+  
     console.log('🎮 PathCreator: Rendering GameBoard with:', {
       pathTilesLength: pathTiles.length,
       gameDataPresent: !!gameData,
       questionsData: !!(gameData?.questionsData || gameData?.content),
       studentName: gameData?.studentName
     });
+
     
     return (
       <GameBoard 

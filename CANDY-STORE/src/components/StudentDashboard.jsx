@@ -15,6 +15,10 @@ const StudentDashboard = ({
 
   // Enhanced game handling with better content flow - ALL GAMES go through PathCreator
   const handleJoinGame = (game) => {
+    console.log('🎯 StudentDashboard: Starting game:', game.title);
+  console.log('🎯 StudentDashboard: Game content exists:', !!game.content);
+  console.log('🎯 StudentDashboard: Game content preview:', game.content?.substring(0, 100));
+  
     console.log('🎮 StudentDashboard: Starting game:', game);
     
     if (game.type === 'personalized') {
